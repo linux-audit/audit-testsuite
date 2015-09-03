@@ -33,10 +33,17 @@ $dir = tempdir(TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1);
 ###
 # tests
 
-# create a new file in a watched directory
+# set the directory watch
 $key = key_gen();
 system("auditctl -w $dir -k $key");
+
+# create a new file in the watched directory
 (my $fh, $filename) = tempfile(TEMPLATE => $dir . "/file-XXXX", UNLINK => 1);
+($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size,
+ $atime, $mtime, $ctime, $blksize, $blocks) = stat($filename);
+$dev_fmt = sprintf("%02x:%02x", $dev >> 7, $dev & 0x00ff);
+$uid_fmt = getpwuid($uid);
+$gid_fmt = getgrgid($uid);
 
 # test if we generate any audit records from the watch
 $result = system("ausearch -i -k $key > $stdout 2> $stderr");
@@ -61,6 +68,9 @@ while ($line = <$fh_out>) {
 		}
 		# test if we generate a PATH(nametype=CREATE) record
 		if ($line =~ / name=$filename / and
+		    $line =~ / dev=$dev_fmt / and $line =~ / inode=$ino / and
+		    $line =~ / ouid=$uid_fmt / and
+		    $line =~ / ogid=$gid_fmt / and
 		    $line =~ / nametype=CREATE /) {
 			$found_create = 1;
 		}
