@@ -1,0 +1,87 @@
+#!/usr/bin/perl
+
+use Test;
+BEGIN { plan tests => 5 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+sub key_gen {
+	my @chars = ("A".."Z", "a".."z");
+	my $key = "testsuite-" . time . "-";
+	$key .= $chars[rand @chars] for 1..8;
+	return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create temp directory
+$dir = tempdir(TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1);
+
+# create stdout/stderr sinks
+(my $fh_out, $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				 UNLINK => 1);
+(my $fh_err, $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				 UNLINK => 1);
+
+###
+# tests
+
+# create a new file in a watched directory
+$key = key_gen();
+(my $fh, $filename) = tempfile(TEMPLATE => $dir . "/file-XXXX", UNLINK => 1);
+system("auditctl -w $dir -k $key");
+
+# move/rename the file
+rename($filename, $filename . "-new");
+
+# test if we generate any audit records from the watch
+$result = system("ausearch -i -k $key > $stdout 2> $stderr");
+ok($result, 0);
+
+# test if we generate the SYSCALL and PATH(PARENT,CREATE) records correctly
+$found_syscall = 0;
+$found_parent = 0;
+$found_create = 0;
+$found_delete = 0;
+while ($line = <$fh_out>) {
+        # test if we generate a PATH(nametype=PARENT) record
+	if ($line =~ /^type=SYSCALL /) {
+		if ($line =~ / syscall=rename / and $line =~ / success=yes /) {
+			$found_syscall = 1;
+		}
+	}
+	if ($line =~ /^type=PATH /) {
+		# test if we generate a PATH(nametype=PARENT) record
+		if ($line =~ / name=$dir\/ / and
+		    $line =~ / nametype=PARENT /) {
+			$found_parent += 1;
+		}
+		# test if we generate a PATH(nametype=CREATE) record
+		if ($line =~ / name=$filename-new / and
+		    $line =~ / nametype=CREATE /) {
+			$found_create = 1;
+		}
+		# test if we generate a PATH(nametype=DELETE) record
+		if ($line =~ / name=$filename / and
+		    $line =~ / nametype=DELETE /) {
+			$found_delete = 1;
+		}
+	}
+}
+ok($found_syscall);
+ok($found_parent, 2);
+ok($found_create);
+ok($found_delete);
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
+
