@@ -22,41 +22,41 @@ sub key_gen {
 system("auditctl -D >& /dev/null");
 
 # create temp directory
-$dir = tempdir(TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1);
+my $dir = tempdir(TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1);
 
 # create stdout/stderr sinks
-(my $fh_out, $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				 UNLINK => 1);
-(my $fh_err, $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				 UNLINK => 1);
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				    UNLINK => 1);
 
 ###
 # tests
 
 # create a new file in the watched directory
-(my $fh, $filename) = tempfile(TEMPLATE => $dir . "/file-XXXX", UNLINK => 1);
-($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size,
- $atime, $mtime, $ctime, $blksize, $blocks) = stat($filename);
-$dev_fmt = sprintf("%02x:%02x", $dev >> 7, $dev & 0x00ff);
-$uid_fmt = getpwuid($uid);
-$gid_fmt = getgrgid($uid);
+(my $fh, my $filename) = tempfile(TEMPLATE => $dir . "/file-XXXX", UNLINK => 1);
+(my $dev, my $ino, my $mode, my $nlink, my $uid, my $gid, my $rdev, my $size,
+ my $atime, my $mtime, my $ctime, my $blksize, my $blocks) = stat($filename);
+my $dev_fmt = sprintf("%02x:%02x", $dev >> 7, $dev & 0x00ff);
+my $uid_fmt = getpwuid($uid);
+my $gid_fmt = getgrgid($uid);
 
 # set the directory watch
-$key = key_gen();
+my $key = key_gen();
 system("auditctl -w $dir -k $key");
 
 # move/rename the file
 rename($filename, $filename . "-new");
 
 # test if we generate any audit records from the watch
-$result = system("ausearch -i -k $key > $stdout 2> $stderr");
+my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
 ok($result, 0);
 
 # test if we generate the SYSCALL and PATH(PARENT,CREATE) records correctly
-$found_syscall = 0;
-$found_parent = 0;
-$found_create = 0;
-$found_delete = 0;
+my $found_syscall = 0;
+my $found_parent = 0;
+my $found_create = 0;
+my $found_delete = 0;
 while ($line = <$fh_out>) {
 	# test if we generate a SYSCALL record
 	if ($line =~ /^type=SYSCALL /) {
