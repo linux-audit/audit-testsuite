@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+use strict;
+
 use Test;
 BEGIN { plan tests => 5 }
 
@@ -53,6 +55,7 @@ my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
 ok($result, 0);
 
 # test if we generate the SYSCALL and PATH(PARENT,CREATE) records correctly
+my $line;
 my $found_syscall = 0;
 my $found_parent = 0;
 my $found_create = 0;

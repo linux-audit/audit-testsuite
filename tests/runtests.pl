@@ -1,19 +1,21 @@
 #!/usr/bin/perl
 
+use strict;
+
 use Test::Harness;
 
-@dirs = split(/ /, $ENV{SUBDIRS});
-
+my @dirs = split(/ /, $ENV{SUBDIRS});
+my @scripts;
 for (@dirs) {
 	push @scripts, "$_/test";
 }
 
-$output = `id`;
+my $output = `id`;
 $output =~ /uid=\d+\((\w+)\).*context=(\w+):(\w+):(\w+)/ || die ("Can't determine user's id\n");
-$unix_user = $1;
-$selinux_user = $2;
-$selinux_role = $3;
-$selinux_type = $4;
+my $unix_user = $1;
+my $selinux_user = $2;
+my $selinux_role = $3;
+my $selinux_type = $4;
 
 print "Running as user $unix_user with context $selinux_user:$selinux_role:$selinux_type\n\n";
 
