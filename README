@@ -5,3 +5,16 @@ https://github.com/linux-audit/audit-testsuite
 The audit-testsuite project provides a simple, self-contained regression test
 for the Linux Kernel's audit subsystem.
 
+* Online Resources
+
+The testsuite source repository currently lives on GitHub at the following URL:
+
+	-> https://github.com/linux-audit/audit-testsuite
+
+* Running the Tests
+
+The tests can be run using the following commands, executed as root from the
+top level directory:
+
+	# make
+	# make test
