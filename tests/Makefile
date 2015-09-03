@@ -17,7 +17,6 @@ all:
 	chmod +x */test
 
 test: all
-	chcon -R -t test_file_t .
 	@SUBDIRS="$(SUBDIRS)" PATH=/usr/bin:/bin:/usr/sbin:/sbin ./runtests.pl
 
 clean: 
