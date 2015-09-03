@@ -51,7 +51,7 @@ $found_parent = 0;
 $found_create = 0;
 $found_delete = 0;
 while ($line = <$fh_out>) {
-        # test if we generate a PATH(nametype=PARENT) record
+	# test if we generate a SYSCALL record
 	if ($line =~ /^type=SYSCALL /) {
 		if ($line =~ / syscall=rename / and $line =~ / success=yes /) {
 			$found_syscall = 1;
