@@ -1,2 +1,7 @@
+audit-testsuite: A Basic Audit Regression Test for the Linux Kernel
+===============================================================================
+https://github.com/linux-audit/audit-testsuite
 
+The audit-testsuite project provides a simple, self-contained regression test
+for the Linux Kernel's audit subsystem.
 
