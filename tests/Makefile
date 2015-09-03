@@ -6,7 +6,8 @@ DISTRO = $(shell ./os_detect)
 SUBDIRS := \
 	file_create \
 	file_delete \
-	file_rename
+	file_rename \
+	user_msg
 
 .PHONY: all test clean
 

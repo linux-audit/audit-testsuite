@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 2 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				    UNLINK => 1);
+(my $fh_tmp, my $tmpout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
+                                    UNLINK => 1);
+
+###
+# tests
+
+# send the userspace message (NOTE: required bash)
+system("echo \$BASHPID\ > $tmpout; exec auditctl -m \"Testing 1 2 3\"");
+my $pid = <$fh_tmp>;
+chomp($pid);
+
+# test for the userspace message
+my $result = system("ausearch -m USER -p $pid > $stdout 2> $stderr");
+ok($result, 0);
+
+# test if we generate the USER record correctly
+my $line;
+my $found_msg = 0;
+while ($line = <$fh_out>) {
+	# test if we generate a USER record
+	if ($line =~ /^type=USER /) {
+		if ($line =~ / pid=$pid / and
+		    $line =~ / msg='Testing 1 2 3 /) {
+			$found_msg = 1;
+		}
+	}
+}
+ok($found_msg);
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
+
