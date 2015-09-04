@@ -11,10 +11,18 @@ The testsuite source repository currently lives on GitHub at the following URL:
 
 	-> https://github.com/linux-audit/audit-testsuite
 
+* Dependencies
+
+Perl 5
+Test::Harness
+	fedora/RHEL: yum install perl-Test-Harness
+	Debian: apt-get install perl-modules
+
 * Running the Tests
 
 The tests can be run using the following commands, executed as root from the
-top level directory:
+top level directory of the audit-testsuite on the system running the kernel
+under test:
 
 	# make
 	# make test
