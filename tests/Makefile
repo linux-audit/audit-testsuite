@@ -7,6 +7,7 @@ SUBDIRS := \
 	file_create \
 	file_delete \
 	file_rename \
+	syscalls_file \
 	user_msg
 
 .PHONY: all test clean
