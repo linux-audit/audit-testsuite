@@ -4,6 +4,7 @@ export CFLAGS+=-g -O0 -Wall -D_GNU_SOURCE
 DISTRO = $(shell ./os_detect)
 
 SUBDIRS := \
+	exec_name \
 	file_create \
 	file_delete \
 	file_rename \

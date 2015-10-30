@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 3 }
+
+use File::Temp qw/ tempfile /;
+
+###
+# functions
+
+sub key_gen {
+	my @chars = ("A".."Z", "a".."z");
+	my $key = "testsuite-" . time . "-";
+	$key .= $chars[rand @chars] for 1..8;
+	return $key;
+}
+
+###
+# setup
+
+# try to find a test executable
+my $exec;
+if (-x "/usr/bin/id") {
+	$exec = "/usr/bin/id";
+} elsif (-x "/bin/id") {
+	$exec = "/bin/id";
+} elsif (-x "/usr/bin/echo") {
+	$exec = "/usr/bin/echo";
+} elsif (-x "/bin/echo") {
+	$exec = "/bin/echo";
+}
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				    UNLINK => 1);
+
+###
+# tests
+
+# see if we found a test executable
+ok($exec ne "");
+
+# set the audit-by-executable filter
+my $key = key_gen();
+system("auditctl -a always,exit -S all -F exe=$exec -k $key");
+
+# run the watched executable
+system("$exec > /dev/null 2> /dev/null");
+
+# test if we generate any audit records from the filter rule
+my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+ok($result, 0);
+
+# test if we generate the SYSCALL record correctly
+my $line;
+my $found_syscall = 0;
+my $found_parent = 0;
+my $found_create = 0;
+while ($line = <$fh_out>) {
+	# test if we generate a SYSCALL record
+	if ($line =~ /^type=SYSCALL /) {
+		if ($line =~ / exe=$exec / ) {
+			$found_syscall = 1;
+		}
+	}
+}
+ok($found_syscall);
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
+
