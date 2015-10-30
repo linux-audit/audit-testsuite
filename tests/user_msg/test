@@ -10,7 +10,12 @@ use File::Temp qw/ tempdir tempfile /;
 ###
 # functions
 
-
+sub key_gen {
+	my @chars = ("A".."Z", "a".."z");
+	my $key = "testsuite-" . time . "-";
+	$key .= $chars[rand @chars] for 1..8;
+	return $key;
+}
 
 ###
 # setup
@@ -29,8 +34,9 @@ system("auditctl -D >& /dev/null");
 ###
 # tests
 
-# send the userspace message (NOTE: required bash)
-system("echo \$BASHPID\ > $tmpout; exec auditctl -m \"Testing 1 2 3\"");
+# send the userspace message (NOTE: requires bash)
+my $key = key_gen();
+system("echo \$BASHPID\ > $tmpout; exec auditctl -m \"Testing 1 2 3 $key\"");
 my $pid = <$fh_tmp>;
 chomp($pid);
 
@@ -45,7 +51,7 @@ while ($line = <$fh_out>) {
 	# test if we generate a USER record
 	if ($line =~ /^type=USER /) {
 		if ($line =~ / pid=$pid / and
-		    $line =~ / msg='Testing 1 2 3 /) {
+		    $line =~ / msg='Testing 1 2 3 $key /) {
 			$found_msg = 1;
 		}
 	}
