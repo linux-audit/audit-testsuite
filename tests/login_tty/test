@@ -30,9 +30,10 @@ system("auditctl -D >& /dev/null");
 # tests
 
 # get the tty of this test shell
-system("tty | sed 's_/dev/__' > $ttyout");
+system("tty > $ttyout");
 my $tty = <$fh_tty>;
 chomp($tty);
+$tty =~ s/^\/dev\/(.*)\/(.*)/$1$2/;
 
 # provoke a LOGIN record if one doesn't already exist since the last
 # boot at login time.
