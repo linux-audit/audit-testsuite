@@ -61,8 +61,6 @@ ok($result, 0);
 # test if we generate the SYSCALL record correctly
 my $line;
 my $found_syscall = 0;
-my $found_parent = 0;
-my $found_create = 0;
 while ($line = <$fh_out>) {
 	# test if we generate a SYSCALL record
 	if ($line =~ /^type=SYSCALL /) {
