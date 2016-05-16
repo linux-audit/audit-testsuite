@@ -9,6 +9,7 @@ SUBDIRS := \
 	file_delete \
 	file_rename \
 	syscalls_file \
+	login_tty \
 	user_msg
 
 .PHONY: all test clean
