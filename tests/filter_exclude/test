@@ -1,0 +1,150 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 22 }
+
+use File::Temp qw/ tempfile /;
+use Time::HiRes qw(usleep);
+
+###
+# functions
+
+sub key_gen {
+	my @chars = ("A".."Z", "a".."z");
+	my $key = "testsuite-" . time . "-";
+	$key .= $chars[rand @chars] for 1..8;
+	return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout sinks
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_out2, my $stdout2) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out2-XXXX',
+				    UNLINK => 1);
+(my $fh_subj, my $subjout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-subj-XXXX',
+				    UNLINK => 1);
+
+###
+# tests
+
+my $result;
+my $key = key_gen();
+my $msgtype = "SYSCALL";
+my $pid = $$;
+my $uid = 0;
+my $gid = 0;
+my $auid = 0;
+my $ppid = 1;
+my $euid = 0;
+my $obj_user = "system_u";
+
+# get selinux labels
+my ($subj_user, $subj_role, $subj_type, $subj_sen, $subj_clr);
+$result = system("id -Z >$subjout 2>/dev/null");
+ok($result, 0);
+my $subj = <$fh_subj>;
+chomp($subj);
+if($subj =~ /([^:]+):([^:]+):([^:]+):([^-]+)-([^-]+)/) {
+	($subj_user, $subj_role, $subj_type, $subj_sen, $subj_clr) = ($1, $2, $3, $4, $5);
+}
+
+# try adding rule for each supported field type and test for (a few)
+# unsupported types
+$result = system("auditctl -a exclude,always -F msgtype=$msgtype");
+ok($result, 0);
+system("auditctl -d exclude,always -F msgtype=$msgtype");
+$result = system("auditctl -a exclude,always -F pid=$pid");
+ok($result, 0);
+system("auditctl -d exclude,always -F pid=$pid");
+$result = system("auditctl -a exclude,always -F uid=$uid");
+ok($result, 0);
+system("auditctl -d exclude,always -F uid=$uid");
+$result = system("auditctl -a exclude,always -F gid=$gid");
+ok($result, 0);
+system("auditctl -d exclude,always -F gid=$gid");
+$result = system("auditctl -a exclude,always -F auid=$auid");
+ok($result, 0);
+system("auditctl -d exclude,always -F auid=$auid");
+$result = system("auditctl -a exclude,always -F loginuid_set=0");
+ok($result, 0);
+system("auditctl -d exclude,always -F loginuid_set=0");
+$result = system("auditctl -a exclude,always -F subj_user=$subj_user");
+ok($result, 0);
+system("auditctl -d exclude,always -F subj_user=$subj_user");
+$result = system("auditctl -a exclude,always -F subj_role=$subj_role");
+ok($result, 0);
+system("auditctl -d exclude,always -F subj_role=$subj_role");
+$result = system("auditctl -a exclude,always -F subj_type=$subj_type");
+ok($result, 0);
+system("auditctl -d exclude,always -F subj_type=$subj_type");
+$result = system("auditctl -a exclude,always -F subj_sen=$subj_sen");
+ok($result, 0);
+system("auditctl -d exclude,always -F subj_sen=$subj_sen");
+$result = system("auditctl -a exclude,always -F subj_clr=$subj_clr");
+ok($result, 0);
+system("auditctl -d exclude,always -F subj_clr=$subj_clr");
+
+$result = system("auditctl -a exclude,always -F ppid=$ppid >/dev/null 2>&1");
+ok($result ne 0);
+system("auditctl -d exclude,always -F ppid=$ppid >/dev/null 2>&1");
+$result = system("auditctl -a exclude,always -F euid=$euid >/dev/null 2>&1");
+ok($result ne 0);
+system("auditctl -d exclude,always -F euid=$euid >/dev/null 2>&1");
+$result = system("auditctl -a exclude,always -F obj_user=$obj_user >/dev/null 2>&1");
+ok($result ne 0);
+system("auditctl -d exclude,always -F obj_user=$obj_user >/dev/null 2>&1");
+
+$result = system("auditctl -a exclude,always -F msgtype=$msgtype -F pid=$pid -F uid=$uid -F gid=$gid -F auid=$auid -F subj_user=$subj_user -F subj_role=$subj_role -F subj_type=$subj_type -F subj_sen=$subj_sen -F subj_clr=$subj_clr");
+ok($result, 0);
+
+$result = system("auditctl -a exit,always -F arch=b64 -S all -F path=/tmp/$key");
+ok($result, 0);
+
+open(my $tmpfile, ">", "/tmp/$key");
+close($tmpfile);
+
+# test for the SYSCALL message provoked by creat
+$result = system("ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj_user:$subj_role:$subj_type:$subj_sen-$subj_clr -ts recent > $stdout 2> /dev/null");
+ok($result, 256);
+
+my $found_msg = 0;
+my $line;
+while ($line = <$fh_out>) {
+	$found_msg = 1;
+}
+ok($found_msg, 0);
+
+$result = system("auditctl -d exclude,always -F msgtype=$msgtype -F pid=$pid -F uid=$uid -F gid=$gid -F auid=$auid -F subj_user=$subj_user -F subj_role=$subj_role -F subj_type=$subj_type -F subj_sen=$subj_sen -F subj_clr=$subj_clr");
+ok($result, 0);
+
+unlink "/tmp/$key";
+
+system("sync");
+
+# test for the SYSCALL message provoked by unlink
+$result = system("ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj_user:$subj_role:$subj_type:$subj_sen-$subj_clr -ts recent > $stdout2 2> /dev/null");
+ok($result, 0);
+
+$found_msg = 0;
+while ($line = <$fh_out2>) {
+	# test if we generate a SYSCALL unlink record
+	if ($line =~ /^type=SYSCALL /) {
+		if ($line =~ / syscall=unlink / ) {
+			$found_msg = 1;
+		}
+	}
+}
+ok($found_msg, 1);
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
