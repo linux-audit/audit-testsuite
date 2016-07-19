@@ -5,6 +5,7 @@ DISTRO = $(shell ./os_detect)
 
 SUBDIRS := \
 	exec_name \
+	exec_execve \
 	file_create \
 	file_delete \
 	file_rename \
