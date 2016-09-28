@@ -9,7 +9,6 @@ SUBDIRS := \
 	file_create \
 	file_delete \
 	file_rename \
-	filter_exclude \
 	login_tty \
 	syscalls_file \
 	user_msg
