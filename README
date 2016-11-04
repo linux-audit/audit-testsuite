@@ -13,10 +13,15 @@ The testsuite source repository currently lives on GitHub at the following URL:
 
 * Dependencies
 
-Perl 5
-Test::Harness
-	fedora/RHEL: yum install perl-Test-Harness
-	Debian: apt-get install perl-modules
+The audit-testsuite depends on the Perl 5 Test and Test::Harness modules.
+Sample commands for installing these dependencies on various distributions are
+given below:
+
+	Fedora / RHEL based systems
+	# dnf install perl perl-Test perl-Test-Harness
+
+	Debian based systems
+	# apt-get install perl-modules
 
 * Running the Tests
 
