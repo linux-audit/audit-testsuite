@@ -3,7 +3,9 @@
 use strict;
 
 use Test::Harness;
+use File::Which;
 
+# Gather the list of tests to execute.
 my @dirs = split(/ /, $ENV{SUBDIRS});
 my @scripts;
 for (@dirs) {
@@ -11,23 +13,20 @@ for (@dirs) {
 }
 
 my $output = `id`;
-$output =~ /uid=\d+\((\w+)\).*context=(\w+):(\w+):(\w+)/ || die ("Can't determine user's id\n");
+$output =~ /uid=\d+\((\w+)\).*context=(\w+):(\w+):(\w+)/;
+
 my $unix_user = $1;
 my $selinux_user = $2;
 my $selinux_role = $3;
 my $selinux_type = $4;
 
-print "Running as user $unix_user with context $selinux_user:$selinux_role:$selinux_type\n\n";
+# Sanity checks prior to test execution.
+die ("These tests are intended to be run as root\n") unless $unix_user eq "root";
+die ("The auditctl tool cannot be found\n") unless which "auditctl";
 
-if ($unix_user ne "root") {
-	print "These tests are intended to be run as root\n";
-	exit;
-}
+print "Running as   user    $unix_user\n";
+print "        with context $selinux_user:$selinux_role:$selinux_type\n";
+print "        on   system  $ENV{DISTRO}\n\n";
 
-if (! -x "/usr/sbin/auditctl") {
-	print "The auditctl tool cannot be found\n";
-	exit;
-}
-
+# Execute tests.
 runtests(@scripts);
-

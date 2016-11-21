@@ -1,7 +1,7 @@
 
 export CFLAGS+=-g -O0 -Wall -D_GNU_SOURCE
 
-DISTRO = $(shell ./os_detect)
+DISTRO := $(shell ./os_detect)
 
 SUBDIRS := \
 	exec_execve \
@@ -22,7 +22,7 @@ all:
 	chmod +x */test
 
 test: all
-	@SUBDIRS="$(SUBDIRS)" PATH=/usr/bin:/bin:/usr/sbin:/sbin ./runtests.pl
+	@DISTRO="$(DISTRO)" SUBDIRS="$(SUBDIRS)" PATH=/usr/bin:/bin:/usr/sbin:/sbin ./runtests.pl
 
 clean: 
 	@for subdir in $(SUBDIRS); do \

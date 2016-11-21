@@ -1,9 +1,14 @@
 #!/bin/bash
 
-if [[ -r /etc/redhat-release ]]; then
-	ver=$(cat /etc/redhat-release | sed -ne '/^Red Hat Enterprise Linux/p')
-	if [[ -n $ver ]]; then
-		echo "$ver" | \
-			sed -e 's/Red Hat Enterprise Linux[ \ta-zA-Z]*\([0-9]\+\).*/RHEL\1/'
-	fi
+# Detect OS distribution (Debian/Fedora/RHEL6/RHEL7).
+distro=""
+
+if [[ -r /etc/debian-version ]]; then
+    distro="Debian"
+elif [[ -r /etc/fedora-release ]]; then
+    distro="Fedora"
+elif [[ -r /etc/redhat-release ]]; then
+    distro=$(sed -e 's/.*Linux[ \ta-zA-Z]*\([0-9]\+\).*/RHEL\1/' /etc/redhat-release)
 fi
+
+echo $distro
