@@ -70,7 +70,7 @@ while ($line = <$fh_out>) {
 	if ($line =~ /^type=PATH /) {
 		# test if we generate a PATH(nametype=PARENT) record
 		if ($line =~ / name=$dir\/ / and
-		    $line =~ / nametype=PARENT /) {
+		    $line =~ / (nametype|objtype)=PARENT /) {
 			$found_parent += 1;
 		}
 		# test if we generate a PATH(nametype=CREATE) record
@@ -78,7 +78,7 @@ while ($line = <$fh_out>) {
 		    $line =~ / dev=$dev_fmt / and $line =~ / inode=$ino / and
 		    $line =~ / ouid=$uid_fmt / and
 		    $line =~ / ogid=$gid_fmt / and
-		    $line =~ / nametype=CREATE /) {
+		    $line =~ / (nametype|objtype)=CREATE /) {
 			$found_create = 1;
 		}
 		# test if we generate a PATH(nametype=DELETE) record
@@ -86,7 +86,7 @@ while ($line = <$fh_out>) {
 		    $line =~ / dev=$dev_fmt / and $line =~ / inode=$ino / and
 		    $line =~ / ouid=$uid_fmt / and
 		    $line =~ / ogid=$gid_fmt / and
-		    $line =~ / nametype=DELETE /) {
+		    $line =~ / (nametype|objtype)=DELETE /) {
 			$found_delete = 1;
 		}
 	}
