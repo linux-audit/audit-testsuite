@@ -2,6 +2,7 @@
 export CFLAGS+=-g -O0 -Wall -D_GNU_SOURCE
 
 DISTRO := $(shell ./os_detect)
+MODE := $(shell [ $(shell uname -i) == "i386" ] && echo "32" || echo "64")
 
 SUBDIRS := \
 	exec_execve \
@@ -22,7 +23,11 @@ all:
 	chmod +x */test
 
 test: all
-	@DISTRO="$(DISTRO)" SUBDIRS="$(SUBDIRS)" PATH=/usr/bin:/bin:/usr/sbin:/sbin ./runtests.pl
+	@DISTRO="$(DISTRO)"                 \
+	 MODE="$(MODE)"                     \
+	 SUBDIRS="$(SUBDIRS)"               \
+	 PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+	 ./runtests.pl
 
 clean: 
 	@for subdir in $(SUBDIRS); do \
