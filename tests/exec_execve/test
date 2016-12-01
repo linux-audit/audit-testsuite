@@ -43,8 +43,7 @@ system("auditctl -D >& /dev/null");
 
 # set the audit-by-executable filter
 my $key = key_gen();
-system("auditctl -a always,exit -F arch=b64 -S execve -k $key");
-system("auditctl -a always,exit -F arch=b32 -S execve -k $key");
+system("auditctl -a always,exit -F arch=b$ENV{MODE} -S execve -k $key");
 
 # test parameters
 my $test_count = 2048;

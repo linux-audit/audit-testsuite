@@ -39,7 +39,7 @@ my $result;
 
 # audit all open() syscalls on 64-bit systems
 my $key = key_gen();
-$result = system("auditctl -a always,exit -F arch=b64 -S open -k $key");
+$result = system("auditctl -a always,exit -F arch=b$ENV{MODE} -S open -k $key");
 ok($result, 0);
 
 # create a new file
