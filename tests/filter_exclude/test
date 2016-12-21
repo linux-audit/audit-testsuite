@@ -3,7 +3,7 @@
 use strict;
 
 use Test;
-BEGIN { plan tests => 22 }
+BEGIN { plan tests => 21 }
 
 use File::Temp qw/ tempfile /;
 use Time::HiRes qw(usleep);
@@ -73,9 +73,6 @@ system("auditctl -d exclude,always -F gid=$gid");
 $result = system("auditctl -a exclude,always -F auid=$auid");
 ok($result, 0);
 system("auditctl -d exclude,always -F auid=$auid");
-$result = system("auditctl -a exclude,always -F loginuid_set=0");
-ok($result, 0);
-system("auditctl -d exclude,always -F loginuid_set=0");
 $result = system("auditctl -a exclude,always -F subj_user=$subj_user");
 ok($result, 0);
 system("auditctl -d exclude,always -F subj_user=$subj_user");

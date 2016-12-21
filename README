@@ -18,7 +18,8 @@ Sample commands for installing these dependencies on various distributions are
 given below:
 
 	Fedora / RHEL based systems
-	# dnf install perl perl-Test perl-Test-Harness perl-File-Which
+	# dnf install perl perl-Test perl-Test-Harness \
+	              perl-File-Which perl-Time-HiRes
 
 	Debian based systems
 	# apt-get install perl-modules
