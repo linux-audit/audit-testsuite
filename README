@@ -18,11 +18,17 @@ Sample commands for installing these dependencies on various distributions are
 given below:
 
 	Fedora / RHEL based systems
-	# dnf install perl perl-Test perl-Test-Harness \
-	              perl-File-Which perl-Time-HiRes
+	# dnf install perl \
+	              perl-Test \
+	              perl-Test-Harness \
+	              perl-File-Which \
+	              perl-Time-HiRes \
+	              glibc.i686 \
+	              glibc-devel.i686
 
 	Debian based systems
-	# apt-get install perl-modules
+	# apt-get install perl-modules \
+	                  libc6-i386
 
 * Running the Tests
 
