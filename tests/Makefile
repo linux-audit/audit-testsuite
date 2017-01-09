@@ -14,6 +14,7 @@ SUBDIRS := \
 	filter_sessionid \
 	login_tty \
 	syscalls_file \
+	syscall_socketcall \
 	user_msg
 
 .PHONY: all test clean
