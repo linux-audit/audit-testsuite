@@ -13,12 +13,12 @@ for (@dirs) {
 }
 
 my $output = `id`;
-$output =~ /uid=\d+\((\w+)\).*context=(\w+):(\w+):(\w+)/;
-
+$output =~ /uid=\d+\((\w+)\).*/;
 my $unix_user = $1;
-my $selinux_user = $2;
-my $selinux_role = $3;
-my $selinux_type = $4;
+$output =~ /context=(\w+):(\w+):(\w+)/;
+my $selinux_user = $1;
+my $selinux_role = $2;
+my $selinux_type = $3;
 
 # Sanity checks prior to test execution.
 die ("These tests are intended to be run as root\n") unless $unix_user eq "root";
