@@ -7,7 +7,7 @@ test:
 	make -C tests test
 
 clean:
-	@set -e; for i in $(SUBDIRS); do $(MAKE) -C $$i clean ; done
+	make -C tests clean
 
 check-syntax:
 	@./tools/check-syntax
