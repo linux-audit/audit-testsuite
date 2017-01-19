@@ -48,7 +48,7 @@ system("auditctl -a always,exit -F arch=b32 -S socketcall -F a0=3 -k $key");
 
 my $portno = 42424;
 # run the test
-system("echo Hello World. | $basedir/conn 127.0.0.1 $portno");
+system("echo Hello World. | $basedir/conn 127.0.0.1 $portno >/dev/null 2>&1");
 
 system("sleep 1;sync");
 
