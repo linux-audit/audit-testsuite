@@ -13,6 +13,7 @@ TESTS := \
 	filter_exclude \
 	filter_sessionid \
 	login_tty \
+	netfilter_pkt \
 	syscalls_file \
 	syscall_module \
 	syscall_socketcall \
