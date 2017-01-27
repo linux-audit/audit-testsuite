@@ -26,6 +26,9 @@ given below:
 	              glibc.i686 \
 	              glibc-devel.i686
 
+	RHEL-7.x also requires
+	# dnf install libgcc.i686
+
 	Debian based systems
 	# apt-get install perl-modules \
 	                  libc6-i386
