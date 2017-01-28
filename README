@@ -19,16 +19,31 @@ Test, Test::Harness and File::Which. Some tests require 32-bit glibc packages.
 To install all these dependencies on your distribution on x86_64 architecture
 please follow the instructions below:
 
-        RHEL / Centos
-	# yum install audit gcc glibc.i686 glibc-devel.i686 perl perl-Test \
-                      perl-Test-Harness perl-File-Which
+  RHEL / Centos
+	# yum install audit             \
+                gcc               \
+                glibc.i686        \
+                glibc-devel.i686  \
+                perl              \
+                perl-Test         \
+                perl-Test-Harness \
+                perl-File-Which
 
-        Fedora
-	# dnf install audit gcc glibc.i686 glibc-devel.i686 perl perl-Test \
-                      perl-Test-Harness perl-File-Which
+  Fedora
+	# dnf install audit             \
+                gcc               \
+                glibc.i686        \
+                glibc-devel.i686  \
+                perl              \
+                perl-Test         \
+                perl-Test-Harness \
+                perl-File-Which
 
 	Debian
-	# apt-get install auditd build-essential libc6-i386 perl-modules
+	# apt-get install auditd          \
+                    build-essential \
+                    libc6-i386      \
+                    perl-modules
 
 * Execution
 

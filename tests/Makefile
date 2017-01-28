@@ -2,6 +2,7 @@
 export CFLAGS+=-g -O0 -Wall -D_GNU_SOURCE
 
 DISTRO := $(shell ./os_detect)
+MODE := $(shell [ $(shell uname -i) == "i386" ] && echo "32" || echo "64")
 
 TESTS := \
 	exec_execve \
@@ -9,8 +10,11 @@ TESTS := \
 	file_create \
 	file_delete \
 	file_rename \
+	filter_exclude \
+	filter_sessionid \
 	login_tty \
 	syscalls_file \
+	syscall_socketcall \
 	user_msg
 
 .PHONY: all test clean

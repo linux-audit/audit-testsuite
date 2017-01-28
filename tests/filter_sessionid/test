@@ -1,0 +1,79 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 3 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+sub key_gen {
+	my @chars = ("A".."Z", "a".."z");
+	my $key = "testsuite-" . time . "-";
+	$key .= $chars[rand @chars] for 1..8;
+	return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				    UNLINK => 1);
+(my $fh_ses, my $sesout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-ses-XXXX',
+                                    UNLINK => 1);
+(my $fh_pid, my $pidout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-pid-XXXX',
+                                    UNLINK => 1);
+
+###
+# tests
+
+my $result;
+
+# discover our sesssion ID
+system("cat /proc/self/sessionid > $sesout");
+my $sessionid = <$fh_ses>;
+chomp($sessionid);
+
+# create a key and rule
+my $key = key_gen();
+$result = system("auditctl -a always,exit -F arch=b64 -F path=/tmp/$key -F sessionid=$sessionid -k $key");
+ok($result, 0);
+
+# send the userspace message (NOTE: requires bash)
+system("echo \$\$ > $pidout; exec touch /tmp/$key");
+my $pid = <$fh_pid>;
+chomp($pid);
+
+# test for the SYSCALL message
+$result = system("ausearch -i -m SYSCALL -sc open -p $pid --session $sessionid -k $key > $stdout 2> $stderr");
+ok($result, 0);
+
+# test if we generate the SYSCALL record correctly
+my $line;
+my $syscall_msg_match = 0;
+while ($line = <$fh_out>) {
+	# test if SYSCALL record matches
+	if ($line =~ m?^type=SYSCALL ? and
+	    $line =~ m? pid=$pid ? and
+	    $line =~ m? ses=$sessionid ? and
+	    $line =~ m? key=$key ?) {
+		$syscall_msg_match = 1;
+		last;
+	}
+}
+ok($syscall_msg_match);
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
+
