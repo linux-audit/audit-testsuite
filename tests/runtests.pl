@@ -6,7 +6,7 @@ use Test::Harness;
 use File::Which;
 
 # Gather the list of tests to execute.
-my @dirs = split(/ /, $ENV{SUBDIRS});
+my @dirs = split(/ /, $ENV{TESTS});
 my @scripts;
 for (@dirs) {
 	push @scripts, "$_/test";
