@@ -14,6 +14,7 @@ SUBDIRS := \
 	filter_sessionid \
 	login_tty \
 	syscalls_file \
+	syscall_init_module \
 	syscall_socketcall \
 	user_msg
 
