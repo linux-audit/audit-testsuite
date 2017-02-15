@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Temp qw/ tempdir tempfile /;
+use Test;
+BEGIN { plan tests => 6 }
+
+###
+# functions
+
+###
+# setup
+
+# reset audit rules
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				    UNLINK => 1);
+(my $fh_tmp, my $tmpout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
+                                    UNLINK => 1);
+
+# Kill the daemon and set the buffers low
+system("kill \$(pgrep -x auditd) 2>/dev/null");
+system("auditctl -b 64 >/dev/null 2>&1");
+
+###
+# tests
+my $result;
+# Start floodping to generate activity
+system("ping -f 127.0.0.1 >/dev/null 2>&1 & echo \$! >$tmpout");
+my $ping_pid = <$fh_tmp>;
+chomp($ping_pid);
+# Add rule to generate audit queue events from floodping
+$result = system("auditctl -a exit,always -S all -F pid=$ping_pid >/dev/null");
+ok($result, 0); # Was the rule added successfully?
+sleep 1;
+kill 'TERM', $ping_pid;
+system("auditctl -d exit,always -S all -F pid=$ping_pid >/dev/null");
+
+# Restart the daemon to collect messages in the log
+system("auditd -n &");
+sleep 1;
+
+# send the reset lost message (NOTE: requires bash)
+seek($fh_tmp, 0, 0);
+$result = system("echo \$BASHPID\ >$tmpout; exec auditctl --reset-lost >$stdout 2>$stderr");
+ok($result, 0); # Was the reset command successful?
+my $reset_lost_pid = <$fh_tmp>;
+chomp($reset_lost_pid);
+my $reset_err = <$fh_err>;
+$reset_err =~ /lost: ([0-9]+)/;
+my $result_lost = $1;
+ok($result_lost > 0); # Was the lost value non-zero?
+
+# find the config change event
+seek($fh_out, 0, 0);
+seek($fh_err, 0, 0);
+$result = system("ausearch -ts recent -i -m CONFIG_CHANGE >$stdout 2>$stderr");
+ok($result, 0); # Was an event found?
+
+# test if we generate the lost reset record correctly
+my $line;
+my $found_msg = 0;
+my $lost = 0;
+while ($line = <$fh_out>) {
+	# find the CONFIG_CHANGE record
+	if ($line =~ /^type=CONFIG_CHANGE /) {
+		# find the lost value
+		if ($line =~ / lost=0 old=([0-9]+) /) {
+			$lost = $1;
+			$found_msg = 1;
+		}
+	}
+}
+ok($found_msg, 1); # Was the message well-formed?
+ok($result_lost == $lost); # Do the two lost values agree?
+
+###
+# cleanup
+system("auditctl -D >& /dev/null");
+system("auditctl -b 320 >/dev/null 2>&1");
