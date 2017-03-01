@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Temp qw/ tempfile /;
+use Test;
+BEGIN { plan tests => 2 }
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+###
+# setup
+
+# create stdout/stderr sinks
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				    UNLINK => 1);
+(my $fh_out2, my $stdout2) = tempfile(
+				TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				UNLINK => 1);
+(my $fh_err2, my $stderr2) = tempfile(
+				TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				UNLINK => 1);
+
+###
+# tests
+
+# run the test
+my $line;
+my $key = "ghak8-setuid-exec";
+my $checkpoint = "/tmp/audit_testsuite-syscall_execve_noBPRM_FCAPS-checkpoint";
+
+# test if we generate any audit records from the filter rule
+my $result = system("ausearch --checkpoint $checkpoint --start checkpoint -i --syscall execve -k $key > $stdout 2> $stderr");
+ok($result, 0); # Did we find any records matching the search key?
+
+# test if we generate the PATH record with null name field
+my $found_bprm_fcaps = 0;
+my $id = "";
+my $msgtime = "";
+my $msgdate = "";
+my $line2;
+seek($fh_out, 0, 0);
+seek($fh_err, 0, 0);
+while ($line = <$fh_out>) {
+	if ($line =~ /^type=SYSCALL / && $line =~ / syscall=execve /) {
+		my $bprm_fcaps = 0;
+		my ($comm) = ($line =~ / comm=([^ ]+) /);
+		my $proctitle = "";
+		($id) = ($line =~ / msg=audit\(.*:([0-9]*)\).* /);
+		($msgdate) = ($line =~ / msg=audit\(([^ ]*) .*:[0-9]*\).* /);
+		($msgtime) = ($line =~ / msg=audit\([^ ]* (.*):[0-9]*\).* /);
+		seek($fh_out2, 0, 0);
+		system("ausearch -i -ts $msgdate -a $id -k $key >$stdout2 2>$stderr2");
+		while ($line2 = <$fh_out2>) {
+			if ($line2 =~ /^type=BPRM_FCAPS /) {
+				$bprm_fcaps = 1;
+			}
+			if ($line2 =~ /^type=PROCTITLE /) {
+				$line2 =~ / proctitle=(.*)$/;
+				$proctitle = $1;
+			}
+		}
+		if ($bprm_fcaps) {
+			$found_bprm_fcaps = 1;
+			print "  msg ID:$id date:$msgdate time:$msgtime\n";
+			if ($proctitle != "") {
+				print "  BPRM_FCAPS found: \"$proctitle\"\n";
+			} else {
+				print "  BPRM_FCAPS found: \"$comm\"\n";
+			}
+		}
+	}
+}
+ok($found_bprm_fcaps, 0); # Were no execve SYSCALL BPRM_FCAPS records detected?
+
+###
+# cleanup
