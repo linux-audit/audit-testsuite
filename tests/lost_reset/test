@@ -23,7 +23,7 @@ system("auditctl -D >& /dev/null");
                                     UNLINK => 1);
 
 # Kill the daemon and set the buffers low
-system("kill \$(pgrep -x auditd) 2>/dev/null");
+system("service auditd stop 2>/dev/null");
 system("auditctl -b 64 >/dev/null 2>&1");
 
 ###
@@ -41,7 +41,7 @@ kill 'TERM', $ping_pid;
 system("auditctl -d exit,always -S all -F pid=$ping_pid >/dev/null");
 
 # Restart the daemon to collect messages in the log
-system("auditd -n &");
+system("service auditd start 2>/dev/null");
 sleep 1;
 
 # send the reset lost message (NOTE: requires bash)
