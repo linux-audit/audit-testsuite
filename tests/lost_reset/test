@@ -80,5 +80,4 @@ ok($result_lost == $lost); # Do the two lost values agree?
 
 ###
 # cleanup
-system("auditctl -D >& /dev/null");
-system("auditctl -b 320 >/dev/null 2>&1");
+system("service auditd restart 2>/dev/null");
