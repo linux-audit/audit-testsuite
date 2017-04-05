@@ -61,7 +61,7 @@ my @setup = (
 my @pid;
 my @trig = (
 	"ping -q -c 1 $daddr[0] >/dev/null 2>&1",
-	"ping -q -c 1 $daddr[1] >/dev/null 2>&1",
+	"ping6 -q -c 1 $daddr[1] >/dev/null 2>&1",
 	"exec 3<>/dev/udp/$daddr[2]/$port >/dev/null 2>&1;echo hi >&3",
 	"exec 4<>/dev/udp/$daddr[3]/$port >/dev/null 2>&1;echo hi >&4",
 	"exec 5<>/dev/tcp/$daddr[4]/$port >/dev/null 2>&1",
