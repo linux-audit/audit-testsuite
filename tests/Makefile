@@ -11,6 +11,7 @@ TESTS := \
 	file_delete \
 	file_rename \
 	filter_exclude \
+	filter_rules-memleak \
 	filter_sessionid \
 	login_tty \
 	syscalls_file \
