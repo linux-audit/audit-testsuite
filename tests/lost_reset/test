@@ -3,7 +3,8 @@
 use strict;
 use File::Temp qw/ tempdir tempfile /;
 use Test;
-BEGIN { plan tests => 6 }
+my $iterations = 10;
+BEGIN { plan tests => 5 + $iterations }
 
 ###
 # functions
@@ -22,27 +23,36 @@ system("auditctl -D >& /dev/null");
 (my $fh_tmp, my $tmpout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
                                     UNLINK => 1);
 
-# Kill the daemon and set the buffers low
-system("service auditd stop 2>/dev/null");
-system("auditctl -b 64 >/dev/null 2>&1");
+my $result;
+my $i;
+for ($i = 0; $i < $iterations; $i++) {
+# Kill the daemon, set the buffers low, set the wait time to 1ms, turn on auditing
+system("service auditd stop >/dev/null 2>&1");
+system("auditctl -D >/dev/null 2>&1");
+system("auditctl -b 1 >/dev/null 2>&1");
+system("auditctl --backlog_wait_time 1 >/dev/null 2>&1");
+system("auditctl -e 1 >/dev/null 2>&1");
 
 ###
 # tests
-my $result;
 # Start floodping to generate activity
+seek($fh_tmp, 0, 0);
 system("ping -f 127.0.0.1 >/dev/null 2>&1 & echo \$! >$tmpout");
 my $ping_pid = <$fh_tmp>;
 chomp($ping_pid);
 # Add rule to generate audit queue events from floodping
-$result = system("auditctl -a exit,always -S all -F pid=$ping_pid >/dev/null");
+$result = system("auditctl -a exit,always -S all -F pid=$ping_pid >/dev/null 2>&1");
 ok($result, 0); # Was the rule added successfully?
 sleep 1;
 kill 'TERM', $ping_pid;
-system("auditctl -d exit,always -S all -F pid=$ping_pid >/dev/null");
+system("auditctl -d exit,always -S all -F pid=$ping_pid >/dev/null 2>&1");
 
 # Restart the daemon to collect messages in the log
-system("service auditd start 2>/dev/null");
+system("service auditd start >/dev/null 2>&1");
 sleep 1;
+}
+
+system("auditctl -s");
 
 # send the reset lost message (NOTE: requires bash)
 seek($fh_tmp, 0, 0);
@@ -54,6 +64,8 @@ my $reset_err = <$fh_err>;
 $reset_err =~ /lost: ([0-9]+)/;
 my $result_lost = $1;
 ok($result_lost > 0); # Was the lost value non-zero?
+
+sleep 1;
 
 # find the config change event
 seek($fh_out, 0, 0);
@@ -77,6 +89,12 @@ while ($line = <$fh_out>) {
 }
 ok($found_msg, 1); # Was the message well-formed?
 ok($result_lost == $lost); # Do the two lost values agree?
+
+if (!$result_lost || !$lost || $result_lost != $lost) {
+	print "lost_rc: $result_lost\n";
+	print "lost_msg: $lost\n";
+	print "loop completed $i times\n";
+}
 
 ###
 # cleanup
