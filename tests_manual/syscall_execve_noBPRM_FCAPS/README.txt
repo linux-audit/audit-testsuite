@@ -24,7 +24,7 @@ How to run the test:
 
 	# cd tests_manual/syscall_execve_noBPRM_FCAPS
 
-2) As rot, set up the test, which adds an audit rule to log all execve syscalls
+2) As root, set up the test, which adds an audit rule to log all execve syscalls
 where the uid and euid are not equivalent.
 
 	# ./setup

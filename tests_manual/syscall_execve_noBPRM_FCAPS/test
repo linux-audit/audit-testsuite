@@ -31,12 +31,12 @@ $basedir =~ s|(.*)/[^/]*|$1|;
 
 # run the test
 my $line;
-my $key = "ghak8-setuid-exec";
+my $key = "ghak16-setuid-exec";
 my $checkpoint = "/tmp/audit_testsuite-syscall_execve_noBPRM_FCAPS-checkpoint";
 
 # test if we generate any audit records from the filter rule
 my $result = system("ausearch --checkpoint $checkpoint --start checkpoint -i --syscall execve -k $key > $stdout 2> $stderr");
-ok($result, 0); # Did we find any records matching the search key?
+ok($result, 0); # Did we find any records matching the search key?  Ran setup?
 
 # test if we generate the PATH record with null name field
 my $found_bprm_fcaps = 0;

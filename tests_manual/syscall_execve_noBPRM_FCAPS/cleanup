@@ -1,6 +1,6 @@
 #!/bin/sh
 
-key=ghak8-setuid-exec
+key=ghak16-setuid-exec
 checkpoint=/tmp/audit_testsuite-syscall_execve_noBPRM_FCAPS-checkpoint
 
 auditctl -d always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k $key
