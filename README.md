@@ -1,25 +1,28 @@
-audit-testsuite: A Basic Audit Regression Test for the Linux Kernel
+Basic Audit Regression Test Suite for the Linux Kernel
 ===============================================================================
 https://github.com/linux-audit/audit-testsuite
 
 The audit-testsuite project provides a simple, self-contained regression test
-for the Linux Kernel's audit subsystem.
+suite for the Linux Kernel's audit subsystem.
 
-* Online Resources
+## Online Resources
 
-The testsuite source repository currently lives on GitHub at the following URL:
+The test suite's source repository currently lives on GitHub at the following
+URL:
 
-	-> https://github.com/linux-audit/audit-testsuite
+* https://github.com/linux-audit/audit-testsuite
 
-* Installation
+## Installation
 
-The audit-testsuite requires audit, a C compiler (gcc), Perl 5 and its modules
-Test, Test::Harness and File::Which. Some tests require 32-bit glibc packages.
+The audit-testsuite requires the audit userspace, a C compiler (gcc), Perl 5,
+and some additional Perl modules (see the list below). Some tests also require
+32-bit glibc packages.
 
 To install all these dependencies on your distribution on x86_64 architecture
-please follow the instructions below:
+please follow the instructions below.
 
-	RHEL / Centos
+### RHEL / Centos
+
 	# yum install audit \
 	              gcc \
 	              glibc.i686 \
@@ -31,7 +34,8 @@ please follow the instructions below:
 	              perl-File-Which \
 	              perl-Time-HiRes
 
-	Fedora
+### Fedora
+
 	# dnf install audit \
 	              gcc \
 	              glibc.i686 \
@@ -42,28 +46,34 @@ please follow the instructions below:
 	              perl-File-Which \
 	              perl-Time-HiRes
 
-	Debian based systems
+### Debian Based Systems
+
 	# apt-get install auditd \
 	                  build-essential \
 	                  libc6-i386 \
 	                  perl-modules
 
-* Execution
+## Execution
 
 Please notice that tests are changing kernel audit rules and hence it might be
 a good idea to back them up prior testing and restore them afterwards. The
 tests need to be executed as root.
 
-Execute the following commands from audit-testsuite directory:
+All of the commands listed below should be executed from the audit-testsuite
+top level directory.
 
-	To build all tests
+### Build the Tests
+
 	# make
 
-	To list all tests
+### List the Tests
+
 	# make list
 
-	To execute all tests
+### Execute the Entire Test Suite
+
 	# make test
 
-	To execute a subset of all tests
+### Execute a Subset of the Test Suite
+
 	# TESTS="test1 test2 ..." make -e test
