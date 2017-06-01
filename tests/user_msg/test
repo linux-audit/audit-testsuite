@@ -11,10 +11,10 @@ use File::Temp qw/ tempdir tempfile /;
 # functions
 
 sub key_gen {
-	my @chars = ("A".."Z", "a".."z");
-	my $key = "testsuite-" . time . "-";
-	$key .= $chars[rand @chars] for 1..8;
-	return $key;
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
 }
 
 ###
@@ -24,12 +24,18 @@ sub key_gen {
 system("auditctl -D >& /dev/null");
 
 # create stdout/stderr sinks
-(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				    UNLINK => 1);
-(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				    UNLINK => 1);
-(my $fh_tmp, my $tmpout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
-                                    UNLINK => 1);
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_tmp, my $tmpout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
+    UNLINK   => 1
+);
 
 ###
 # tests
@@ -42,19 +48,21 @@ chomp($pid);
 
 # test for the userspace message
 my $result = system("ausearch -m USER -p $pid > $stdout 2> $stderr");
-ok($result, 0);
+ok( $result, 0 );
 
 # test if we generate the USER record correctly
 my $line;
 my $found_msg = 0;
-while ($line = <$fh_out>) {
-	# test if we generate a USER record
-	if ($line =~ /^type=USER /) {
-		if ($line =~ / pid=$pid / and
-		    $line =~ / msg='Testing 1 2 3 $key /) {
-			$found_msg = 1;
-		}
-	}
+while ( $line = <$fh_out> ) {
+
+    # test if we generate a USER record
+    if ( $line =~ /^type=USER / ) {
+        if (    $line =~ / pid=$pid /
+            and $line =~ / msg='Testing 1 2 3 $key / )
+        {
+            $found_msg = 1;
+        }
+    }
 }
 ok($found_msg);
 

@@ -14,10 +14,10 @@ $basedir =~ s|(.*)/[^/]*|$1|;
 # functions
 
 sub key_gen {
-	my @chars = ("A".."Z", "a".."z");
-	my $key = "testsuite-" . time . "-";
-	$key .= $chars[rand @chars] for 1..8;
-	return $key;
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
 }
 
 ###
@@ -27,10 +27,14 @@ sub key_gen {
 system("auditctl -D >& /dev/null");
 
 # create stdout/stderr sinks
-(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				    UNLINK => 1);
-(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				    UNLINK => 1);
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
 
 ###
 # tests
@@ -38,50 +42,53 @@ system("auditctl -D >& /dev/null");
 # set the socketcall filter
 my $key = key_gen();
 my $result;
+
 # connect
-system("auditctl -a always,exit -F arch=b64 -S init_module -S finit_module -k $key-load");
+system(
+"auditctl -a always,exit -F arch=b64 -S init_module -S finit_module -k $key-load"
+);
 system("auditctl -a always,exit -F arch=b64 -S delete_module -k $key-unload");
 
 # run the test
 my $name = "arp_tables";
 $result = system("modprobe $name >/dev/null 2>&1");
-ok($result, 0); # Did the modprobe succeed?
+ok( $result, 0 );    # Did the modprobe succeed?
 system("sleep 1;sync");
 
 # test if we generate any audit records from the filter rule
 $result = system("ausearch -k $key-load > $stdout 2> $stderr");
-ok($result, 0); # Did the load search find records?
+ok( $result, 0 );    # Did the load search find records?
 
 # test if we generate the MODULE record
 my $line;
 my $type;
 my $found_name = 0;
-while ($line = <$fh_out>) {
-	if ($line =~ /^type=KERN_MODULE /) {
-		if ($line =~ / name=\"$name\"/) {
-			$found_name = 1;
-		}
-	}
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=KERN_MODULE / ) {
+        if ( $line =~ / name=\"$name\"/ ) {
+            $found_name = 1;
+        }
+    }
 }
-ok($found_name); # Was the load module found?
+ok($found_name);    # Was the load module found?
 
 $result = system("rmmod $name");
-ok($result, 0); # Did the rmmod succeed?
+ok( $result, 0 );    # Did the rmmod succeed?
 system("sleep 1;sync");
-seek($fh_out, 0, 0);
-seek($fh_err, 0, 0);
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
 $found_name = 0;
-$result = system("ausearch -k $key-unload > $stdout 2> $stderr");
-ok($result, 0); # Did the unlaod search find records?
+$result     = system("ausearch -k $key-unload > $stdout 2> $stderr");
+ok( $result, 0 );    # Did the unlaod search find records?
 
-while ($line = <$fh_out>) {
-	if ($line =~ /^type=KERN_MODULE /) {
-		if ($line =~ / name=\"$name\"/) {
-			$found_name = 1;
-		}
-	}
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=KERN_MODULE / ) {
+        if ( $line =~ / name=\"$name\"/ ) {
+            $found_name = 1;
+        }
+    }
 }
-ok($found_name); # Was the unload module found?
+ok($found_name);     # Was the unload module found?
 
 ###
 # cleanup
