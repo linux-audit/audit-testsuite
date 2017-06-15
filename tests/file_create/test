@@ -78,7 +78,9 @@ while ( $line = <$fh_out> ) {
 
     # test if we generate a SYSCALL record
     if ( $line =~ /^type=SYSCALL / ) {
-        if ( $line =~ / syscall=open / and $line =~ / success=yes / ) {
+        if ( ( $line =~ / syscall=open / or $line =~ / syscall=openat / )
+            and $line =~ / success=yes / )
+        {
             $found_syscall = 1;
         }
     }
