@@ -32,7 +32,7 @@ for ($i = 0; $i < $iterations; $i++) {
 	system("auditctl -b 1 >/dev/null 2>&1");
 	system("auditctl --backlog_wait_time 1 >/dev/null 2>&1");
 	system("auditctl -e 1 >/dev/null 2>&1");
-	
+
 	###
 	# tests
 	# Start floodping to generate activity
@@ -46,7 +46,7 @@ for ($i = 0; $i < $iterations; $i++) {
 	sleep 1;
 	kill 'TERM', $ping_pid;
 	system("auditctl -d exit,always -S all -F pid=$ping_pid >/dev/null 2>&1");
-	
+
 	# Restart the daemon to collect messages in the log
 	system("service auditd start >/dev/null 2>&1");
 	sleep 1;
