@@ -77,3 +77,7 @@ top level directory.
 ### Execute a Subset of the Test Suite
 
 	# TESTS="test1 test2 ..." make -e test
+
+### Enable Additional Debugging Output
+
+	# ATS_DEBUG=1 make test
