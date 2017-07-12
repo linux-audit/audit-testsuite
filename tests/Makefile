@@ -13,6 +13,7 @@ SUBDIRS := \
 	filter_exclude \
 	filter_sessionid \
 	login_tty \
+	lost_reset \
 	syscalls_file \
 	syscall_socketcall \
 	user_msg
