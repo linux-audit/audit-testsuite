@@ -88,10 +88,12 @@ while ($line = <$fh_out>) {
 ok($found_msg, 1); # Was the message well-formed?
 ok($result_lost == $lost); # Do the two lost values agree?
 
-if (!$result_lost || !$lost || $result_lost != $lost) {
-	print "lost_rc: $result_lost\n";
-	print "lost_msg: $lost\n";
-	print "loop completed $i times\n";
+if (defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1) {
+	if (!$result_lost || !$lost || $result_lost != $lost) {
+		print "lost_rc: $result_lost\n";
+		print "lost_msg: $lost\n";
+		print "loop completed $i times\n";
+	}
 }
 
 ###
