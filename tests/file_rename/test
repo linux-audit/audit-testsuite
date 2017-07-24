@@ -11,10 +11,10 @@ use File::Temp qw/ tempdir tempfile /;
 # functions
 
 sub key_gen {
-	my @chars = ("A".."Z", "a".."z");
-	my $key = "testsuite-" . time . "-";
-	$key .= $chars[rand @chars] for 1..8;
-	return $key;
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
 }
 
 ###
@@ -24,22 +24,40 @@ sub key_gen {
 system("auditctl -D >& /dev/null");
 
 # create temp directory
-my $dir = tempdir(TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1);
+my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
 
 # create stdout/stderr sinks
-(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				    UNLINK => 1);
-(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				    UNLINK => 1);
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
 
 ###
 # tests
 
 # create a new file in the watched directory
-(my $fh, my $filename) = tempfile(TEMPLATE => $dir . "/file-XXXX", UNLINK => 1);
-(my $dev, my $ino, my $mode, my $nlink, my $uid, my $gid, my $rdev, my $size,
- my $atime, my $mtime, my $ctime, my $blksize, my $blocks) = stat($filename);
-my $dev_fmt = sprintf("%02x:%02x", $dev >> 8, $dev & 0x00ff);
+( my $fh, my $filename ) =
+  tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
+(
+    my $dev,
+    my $ino,
+    my $mode,
+    my $nlink,
+    my $uid,
+    my $gid,
+    my $rdev,
+    my $size,
+    my $atime,
+    my $mtime,
+    my $ctime,
+    my $blksize,
+    my $blocks
+) = stat($filename);
+my $dev_fmt = sprintf( "%02x:%02x", $dev >> 8, $dev & 0x00ff );
 my $uid_fmt = getpwuid($uid);
 my $gid_fmt = getgrgid($uid);
 
@@ -48,51 +66,60 @@ my $key = key_gen();
 system("auditctl -w $dir -k $key");
 
 # move/rename the file
-rename($filename, $filename . "-new");
+rename( $filename, $filename . "-new" );
 
 # test if we generate any audit records from the watch
 my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
-ok($result, 0);
+ok( $result, 0 );
 
 # test if we generate the SYSCALL and PATH(PARENT,CREATE) records correctly
 my $line;
 my $found_syscall = 0;
-my $found_parent = 0;
-my $found_create = 0;
-my $found_delete = 0;
-while ($line = <$fh_out>) {
-	# test if we generate a SYSCALL record
-	if ($line =~ /^type=SYSCALL /) {
-		if ($line =~ / syscall=rename / and $line =~ / success=yes /) {
-			$found_syscall = 1;
-		}
-	}
-	if ($line =~ /^type=PATH /) {
-		# test if we generate a PATH(nametype=PARENT) record
-		if ($line =~ / name=$dir\/ / and
-		    $line =~ / (nametype|objtype)=PARENT /) {
-			$found_parent += 1;
-		}
-		# test if we generate a PATH(nametype=CREATE) record
-		if ($line =~ / name=$filename-new / and
-		    $line =~ / dev=$dev_fmt / and $line =~ / inode=$ino / and
-		    $line =~ / ouid=$uid_fmt / and
-		    $line =~ / ogid=$gid_fmt / and
-		    $line =~ / (nametype|objtype)=CREATE /) {
-			$found_create = 1;
-		}
-		# test if we generate a PATH(nametype=DELETE) record
-		if ($line =~ / name=$filename / and
-		    $line =~ / dev=$dev_fmt / and $line =~ / inode=$ino / and
-		    $line =~ / ouid=$uid_fmt / and
-		    $line =~ / ogid=$gid_fmt / and
-		    $line =~ / (nametype|objtype)=DELETE /) {
-			$found_delete = 1;
-		}
-	}
+my $found_parent  = 0;
+my $found_create  = 0;
+my $found_delete  = 0;
+while ( $line = <$fh_out> ) {
+
+    # test if we generate a SYSCALL record
+    if ( $line =~ /^type=SYSCALL / ) {
+        if ( $line =~ / syscall=rename / and $line =~ / success=yes / ) {
+            $found_syscall = 1;
+        }
+    }
+    if ( $line =~ /^type=PATH / ) {
+
+        # test if we generate a PATH(nametype=PARENT) record
+        if (    $line =~ / name=$dir\/ /
+            and $line =~ / (nametype|objtype)=PARENT / )
+        {
+            $found_parent += 1;
+        }
+
+        # test if we generate a PATH(nametype=CREATE) record
+        if (    $line =~ / name=$filename-new /
+            and $line =~ / dev=$dev_fmt /
+            and $line =~ / inode=$ino /
+            and $line =~ / ouid=$uid_fmt /
+            and $line =~ / ogid=$gid_fmt /
+            and $line =~ / (nametype|objtype)=CREATE / )
+        {
+            $found_create = 1;
+        }
+
+        # test if we generate a PATH(nametype=DELETE) record
+        if (    $line =~ / name=$filename /
+            and $line =~ / dev=$dev_fmt /
+            and $line =~ / inode=$ino /
+            and $line =~ / ouid=$uid_fmt /
+            and $line =~ / ogid=$gid_fmt /
+            and $line =~ / (nametype|objtype)=DELETE / )
+        {
+            $found_delete = 1;
+        }
+    }
 }
 ok($found_syscall);
-ok($found_parent, 2);
+ok( $found_parent, 2 );
 ok($found_create);
 ok($found_delete);
 

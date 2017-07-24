@@ -17,14 +17,22 @@ use File::Temp qw/ tempdir tempfile /;
 system("auditctl -D >& /dev/null");
 
 # create stdout/stderr sinks
-(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				    UNLINK => 1);
-(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				    UNLINK => 1);
-(my $fh_tty, my $ttyout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
-                                    UNLINK => 1);
-(my $fh_tmp, my $tmpout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
-                                    UNLINK => 1);
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_tty, my $ttyout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
+    UNLINK   => 1
+);
+( my $fh_tmp, my $tmpout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
+    UNLINK   => 1
+);
 
 ###
 # tests
@@ -34,8 +42,8 @@ system("tty > $ttyout");
 my $tty = <$fh_tty>;
 chomp($tty);
 $tty =~ s/^\/dev\/(.*)/$1/;
-if ($tty =~ /^pts\//) {
-	$tty =~ s/^pts\/(.*)/pts$1/;
+if ( $tty =~ /^pts\// ) {
+    $tty =~ s/^pts\/(.*)/pts$1/;
 }
 
 # provoke a LOGIN record if one doesn't already exist since the last
@@ -48,20 +56,23 @@ my $pid = <$fh_tmp>;
 chomp($pid);
 
 # test for the LOGIN message
-my $result = system("ausearch -m LOGIN -p $pid -ts recent > $stdout 2> $stderr");
-ok($result, 0);
+my $result =
+  system("ausearch -m LOGIN -p $pid -ts recent > $stdout 2> $stderr");
+ok( $result, 0 );
 
 # test if the LOGIN record was generated correctly for this test shell
 my $line;
 my $found_msg = 0;
-while ($line = <$fh_out>) {
-	# test if we generate a LOGIN record with the correct pid and tty
-	if ($line =~ /^type=LOGIN /) {
-		if ($line =~ / pid=$pid / and
-		    $line =~ / tty=$tty /) {
-			$found_msg = 1;
-		}
-	}
+while ( $line = <$fh_out> ) {
+
+    # test if we generate a LOGIN record with the correct pid and tty
+    if ( $line =~ /^type=LOGIN / ) {
+        if (    $line =~ / pid=$pid /
+            and $line =~ / tty=$tty / )
+        {
+            $found_msg = 1;
+        }
+    }
 }
 ok($found_msg);
 

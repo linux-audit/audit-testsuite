@@ -14,10 +14,10 @@ $basedir =~ s|(.*)/[^/]*|$1|;
 # functions
 
 sub key_gen {
-	my @chars = ("A".."Z", "a".."z");
-	my $key = "testsuite-" . time . "-";
-	$key .= $chars[rand @chars] for 1..8;
-	return $key;
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
 }
 
 ###
@@ -27,26 +27,34 @@ sub key_gen {
 system("auditctl -D >& /dev/null");
 
 # create stdout/stderr sinks
-(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				    UNLINK => 1);
-(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				    UNLINK => 1);
-(my $fh_out2, my $stdout2) = tempfile(
-				TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				UNLINK => 1);
-(my $fh_err2, my $stderr2) = tempfile(
-				TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				UNLINK => 1);
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_out2, my $stdout2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err2, my $stderr2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
 
 ###
 # tests
 
 # set the socketcall filter
 my $key = key_gen();
+
 # connect
 system("auditctl -a always,exit -F arch=b32 -S socketcall -F a0=3 -k $key");
 
 my $portno = 42424;
+
 # run the test
 system("echo Hello World. | $basedir/conn 127.0.0.1 $portno >/dev/null 2>&1");
 
@@ -54,30 +62,32 @@ system("sleep 1;sync");
 
 # test if we generate any audit records from the filter rule
 my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
-ok($result, 0);
+ok( $result, 0 );
 
 # test if we generate the SOCKETCALL record
 my $line;
 my $line2;
 my $type;
-my $id = "";
+my $id               = "";
 my $found_socketcall = 0;
-my $found_sockaddr = 0;
-while ($line = <$fh_out>) {
-	if ($line =~ /^type=SOCKADDR /) {
-		if ($line =~ / : saddr=(\{ fam=|)inet (laddr=|host:)127.0.0.1 (lport=|serv:)$portno( \}|)/) {
-			$found_sockaddr = 1;
-			($id) = ($line =~ / msg=audit\(.*:([0-9]*)\).* /);
-			seek($fh_out2, 0, 0);
-			system("ausearch -i -k $key -a $id" .
-				" > $stdout2 2> $stderr2");
-			while ($line2 = <$fh_out2>) {
-				if ($line2 =~ /^type=SOCKETCALL /) {
-					$found_socketcall = 1;
-				}
-			}
-		}
-	}
+my $found_sockaddr   = 0;
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=SOCKADDR / ) {
+        if ( $line =~
+/ : saddr=(\{ fam=|)inet (laddr=|host:)127.0.0.1 (lport=|serv:)$portno( \}|)/
+          )
+        {
+            $found_sockaddr = 1;
+            ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            seek( $fh_out2, 0, 0 );
+            system( "ausearch -i -k $key -a $id" . " > $stdout2 2> $stderr2" );
+            while ( $line2 = <$fh_out2> ) {
+                if ( $line2 =~ /^type=SOCKETCALL / ) {
+                    $found_socketcall = 1;
+                }
+            }
+        }
+    }
 }
 ok($found_socketcall);
 ok($found_sockaddr);

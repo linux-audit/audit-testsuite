@@ -3,9 +3,6 @@
 #
 # code syntax checking tool
 #
-# Originally taken from the libseccomp project
-# -> https://github.com/seccomp
-#
 # Copyright (c) 2013,2015 Red Hat <pmoore@redhat.com>
 # Author: Paul Moore <paul@paul-moore.com>
 #
@@ -26,6 +23,12 @@
 
 CHK_C_LIST="$(find tests/ -name "*.c") $(find tests/ -name "*.h")"
 CHK_C_EXCLUDE=""
+
+CHK_PERL_LIST="$(find tests/ -name "*.pl") $(find tests/ -name "test")"
+CHK_PERL_EXCLUDE=""
+
+CHK_PYTHON_LIST="$(find . -name "*.py")"
+CHK_PYTHON_EXCLUDE=""
 
 ####
 # functions
@@ -49,7 +52,7 @@ function verify_deps() {
 #
 function usage() {
 cat << EOF
-usage: check-syntax [-h]
+usage: check-syntax [-h] [<files>]
 
 code syntax checking tool
 optional arguments:
@@ -60,9 +63,7 @@ EOF
 
 #
 # Generate a properly formatted C source/header file
-#
-# Arguments:
-#     1    Source file
+# $1 - source file
 #
 function tool_c_style() {
 	astyle --options=none --lineend=linux --mode=c \
@@ -80,60 +81,155 @@ function tool_c_style() {
 }
 
 #
-# Check the formatting on a C source/header file
+# Generate a properly formatted Perl source file
+# $1 - source file
 #
-# Arguments:
-#     1    File to check
-#
-function tool_c_style_check() {
-	[[ -z "$1" || ! -r "$1" ]] && return
-
-	tool_c_style "$1" | diff -pu --label="$1.orig" "$1" --label="$1" -
+function tool_perl_style() {
+	perltidy < "$1"
 }
 
 #
-# Fix the formatting on a C source/header file
+# Generate a properly formatted Python source file
+# $1 - source file
 #
-# Arguments:
-#     1    File to fix
-#
-function tool_c_style_fix() {
-	[[ -z "$1" || ! -r "$1" ]] && return
-
-	tmp="$(mktemp --tmpdir=$(dirname "$1"))"
-	tool_c_style "$1" > "$tmp"
-	mv "$tmp" "$1"
+function tool_python_style() {
+	yapf --style=pep8 < "$1"
 }
 
 #
-# Perform all known syntax checks for the configured C sources/headers
+# Check the formatting on a file
+# $1 - language
+# $2 - file to check
 #
-function check_c() {
-	for i in $CHK_C_LIST; do
-		echo "$CHK_C_EXCLUDE" | grep -q "$i" && continue
-		echo "Differences for $i"
-		tool_c_style_check "$i"
+function style_check() {
+	[[ -z "$1" ]] && return
+	[[ -z "$2" || ! -r "$2" ]] && return
+
+	case "$1" in
+	c|C)
+		tool_c_style "$2" | \
+			diff -pu --label="$2.orig" "$2" --label="$2" -
+		;;
+	perl|Perl)
+		tool_perl_style "$2" | \
+			diff -pu --label="$2.orig" "$2" --label="$2" -
+		;;
+	python|Python)
+		tool_python_style "$2" | \
+			diff -pu --label="$2.orig" "$2" --label="$2" -
+		;;
+	esac
+}
+
+#
+# Fix the formatting on a file
+# $1 - language
+# $2 - file to fix
+#
+function style_fix() {
+	[[ -z "$1" ]] && return
+	[[ -z "$2" || ! -w "$2" ]] && return
+
+	tmp="$(mktemp --tmpdir=$(dirname "$2"))"
+	case "$1" in
+	c|C)
+		tool_c_style "$2" > "$tmp"
+		;;
+	perl|Perl)
+		tool_perl_style "$2" > "$tmp"
+		;;
+	python|Python)
+		tool_python_style "$2" > "$tmp"
+		;;
+	esac
+	cat "$tmp" > "$2"
+	rm "$tmp"
+}
+
+#
+# Identify the file types
+# $1 - file to check (optional)
+#
+function identify() {
+	local type;
+
+	[[ $# -eq 0 ]] && return
+
+	# only operate on the files that have been passed as arguments
+	CHK_C_LIST=""
+	CHK_PERL_LIST=""
+	CHK_PYTHON_LIST=""
+
+	# try to identify the files and assign them to lists
+	for i in $*; do
+		type="$(file $i | cut -d':' -f 2-)"
+		if echo $type | grep -q "C source"; then
+			CHK_C_LIST="$CHK_C_LIST $i"
+		elif echo $type | grep -q "Perl script"; then
+			CHK_PERL_LIST="$CHK_PERL_LIST $i"
+		elif echo $type | grep -q "Python script"; then
+			CHK_PYTHON_LIST="$CHK_PYTHON_LIST $i"
+		fi
 	done
 }
 
 #
-# Perform all known syntax fixess for the configured C sources/headers
+# Perform all known syntax checks for the configured files
 #
-function fix_c() {
+function check() {
+	for i in $CHK_C_LIST; do
+		echo "$CHK_C_EXCLUDE" | grep -q "$i" && continue
+		echo "Differences for $i"
+		style_check c "$i"
+	done
+
+	for i in $CHK_PERL_LIST; do
+		echo "$CHK_PERL_EXCLUDE" | grep -q "$i" && continue
+		echo "Differences for $i"
+		style_check perl "$i"
+	done
+
+	for i in $CHK_PYTHON_LIST; do
+		echo "$CHK_PYTHON_EXCLUDE" | grep -q "$i" && continue
+		echo "Differences for $i"
+		style_check python "$i"
+	done
+}
+
+#
+# Perform all known syntax fixes for the configured files
+#
+function fix() {
 	for i in $CHK_C_LIST; do
 		echo "$CHK_C_EXCLUDE" | grep -q "$i" && continue
 		echo "Fixing $i"
-		tool_c_style_fix "$i"
+		style_fix c "$i"
+	done
+
+	for i in $CHK_PERL_LIST; do
+		echo "$CHK_PERL_EXCLUDE" | grep -q "$i" && continue
+		echo "Fixing $i"
+		style_fix perl "$i"
+	done
+
+	for i in $CHK_PYTHON_LIST; do
+		echo "$CHK_PYTHON_EXCLUDE" | grep -q "$i" && continue
+		echo "Fixing $i"
+		style_fix python "$i"
 	done
 }
 
 ####
 # main
 
+verify_deps file
 verify_deps astyle
+verify_deps perltidy
+verify_deps yapf
 
 opt_fix=0
 
+# command line parameters
 while getopts "fh" opt; do
 	case $opt in
 	f)
@@ -145,14 +241,19 @@ while getopts "fh" opt; do
 		;;
 	esac
 done
+shift $(($OPTIND - 1))
+opt_files=$*
 
-# display the results
+# identify any files passed via the command line
+identify $opt_files
+
+# process the files
 echo "=============== $(date) ==============="
 echo "Code Syntax Check Results (\"check-syntax $*\")"
 if [[ $opt_fix -eq 1 ]]; then
-	fix_c
+	fix
 else
-	check_c
+	check
 fi
 echo "============================================================"
 

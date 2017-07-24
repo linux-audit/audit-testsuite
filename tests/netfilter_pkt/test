@@ -1,0 +1,161 @@
+#!/usr/bin/perl
+
+use strict;
+my $debug = 0;
+
+use Test;
+BEGIN { plan tests => 1 + 6 * 2 }
+
+use File::Temp qw/ tempfile /;
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+my $port = "42424";
+my @tests =
+  ( "ipv4_icmp", "ipv6_icmp", "ipv4_udp", "ipv6_udp", "ipv4_tcp", "ipv6_tcp", );
+my @fam   = ( "",      "6",     "",      "6",     "",      "6" );
+my @chain = ( "INPUT", "INPUT", "INPUT", "INPUT", "INPUT", "INPUT" );
+my @saddr = ( "127.0.0.1", "::1", "127.0.0.1", "::1", "127.0.0.1", "::1" );
+my @daddr = ( "127.0.0.1", "::1", "127.0.0.1", "::1", "127.0.0.1", "::1" );
+my @proto = ( "icmp", "ipv6-icmp", "udp", "udp", "tcp", "tcp" );
+my @param = (
+    "-i lo -p icmp --icmp-type echo-request",
+    "-i lo -p icmpv6 --icmpv6-type echo-request",
+    "-i lo -p udp --dport $port",
+    "-i lo -p udp --dport $port",
+    "-i lo -p tcp --dport $port",
+    "-i lo -p tcp --dport $port",
+);
+my @setup =
+  ( "", "", "", "", "nc -l $daddr[4] $port", "nc -l $daddr[5] $port", );
+my @pid;
+my @trig = (
+    "ping -q -c 1 $daddr[0] >/dev/null 2>&1",
+    "ping6 -q -c 1 $daddr[1] >/dev/null 2>&1",
+    "exec 3<>/dev/udp/$daddr[2]/$port >/dev/null 2>&1;echo hi >&3",
+    "exec 4<>/dev/udp/$daddr[3]/$port >/dev/null 2>&1;echo hi >&4",
+    "exec 5<>/dev/tcp/$daddr[4]/$port >/dev/null 2>&1",
+    "exec 5<>/dev/tcp/$daddr[5]/$port >/dev/null 2>&1",
+);
+my @mark;
+my @found;
+my @fields;
+
+for ( 0 .. $#tests ) {
+    $mark[$_]   = sprintf( "%x", int( rand(0xffffffff) ) );
+    $found[$_]  = 0;
+    $fields[$_] = 0;
+}
++my $fields = 5;
+
+# do any setup needed
+for ( 0 .. $#tests ) {
+    if ( $setup[$_] ne "" ) {
+        if ( !( $pid[$_] = fork() ) ) {
+            system("$setup[$_]");
+            exit;
+        }
+    }
+}
+#
+# set the iptables filters
+for ( 0 .. $#tests ) {
+    system( "ip"
+          . $fam[$_]
+          . "tables -I "
+          . $chain[$_] . " "
+          . $param[$_]
+          . " -j AUDIT --type accept" );
+    system( "ip"
+          . $fam[$_]
+          . "tables -I "
+          . $chain[$_]
+          . " -t mangle "
+          . $param[$_]
+          . " -j MARK --set-mark 0x"
+          . $mark[$_] );
+}
+sleep 1;
+
+# run the tests
+for ( 0 .. $#tests ) {
+    system( $trig[$_] );
+}
+
+system("sleep 1; sync");
+
+# test if we generate any audit records from the filter rules
+my $result =
+  system("ausearch -i -m NETFILTER_PKT -ts recent > $stdout 2> $stderr");
+ok( $result, 0 );
+
+# test if we generate the NETFILTER_PKT records correctly
+my $line;
+while ( $line = <$fh_out> ) {
+    for ( 0 .. $#tests ) {
+        if ( !$found[$_] && $line =~ / mark=0x$mark[$_] / ) {
+            if (   $line =~ / saddr=$saddr[$_] /
+                && $line =~ / daddr=$daddr[$_] /
+                && $line =~ / proto=$proto[$_] / )
+            {
+                $found[$_] = 1;
+                $fields[$_] += () = $line =~ / [^ =]*=[^ =]*/g;
+            }
+            else {
+                print $line;
+            }
+        }
+    }
+}
+for ( 0 .. $#tests ) {
+    ok( $found[$_] );    # Was the nfmarked parcket found?
+}
+
+for ( 0 .. $#tests ) {
+    ok( $fields[$_] == $fields );    # $_ Correct number of fields?
+}
+
+###
+# cleanup
+for ( 0 .. $#tests ) {
+    system( "ip"
+          . $fam[$_]
+          . "tables -D "
+          . $chain[$_] . " "
+          . $param[$_]
+          . " -j AUDIT --type accept" );
+    system( "ip"
+          . $fam[$_]
+          . "tables -D "
+          . $chain[$_]
+          . " -t mangle "
+          . $param[$_]
+          . " -j MARK --set-mark 0x"
+          . $mark[$_] );
+    if ( $pid[$_] ) {
+        kill( $pid[$_] );
+    }
+}
+system("auditctl -D >& /dev/null");

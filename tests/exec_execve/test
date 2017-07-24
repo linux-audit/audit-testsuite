@@ -14,10 +14,10 @@ $basedir =~ s|(.*)/[^/]*|$1|;
 # functions
 
 sub key_gen {
-	my @chars = ("A".."Z", "a".."z");
-	my $key = "testsuite-" . time . "-";
-	$key .= $chars[rand @chars] for 1..8;
-	return $key;
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
 }
 
 ###
@@ -27,16 +27,22 @@ sub key_gen {
 system("auditctl -D >& /dev/null");
 
 # create stdout/stderr sinks
-(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				    UNLINK => 1);
-(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				    UNLINK => 1);
-(my $fh_out2, my $stdout2) = tempfile(
-				TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
-				UNLINK => 1);
-(my $fh_err2, my $stderr2) = tempfile(
-				TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-				UNLINK => 1);
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_out2, my $stdout2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err2, my $stderr2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
 
 ###
 # tests
@@ -47,8 +53,8 @@ system("auditctl -a always,exit -F arch=b$ENV{MODE} -S execve -k $key");
 
 # test parameters
 my $test_count = 2048;
-my $test_size = 7499;
-my $test_hex = 6144;
+my $test_size  = 7499;
+my $test_hex   = 6144;
 
 # run the tests
 system("$basedir/execve_arg_gen");
@@ -58,64 +64,64 @@ system("$basedir/execve_arg_gen hex $test_hex");
 
 # test if we generate any audit records from the filter rule
 my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
-ok($result, 0);
+ok( $result, 0 );
 
 # test if we generate the EXECVE records correctly
 my $line;
 my $line2;
 my $id;
 my $found_count = 0;
-my $found_size = 0;
-my $found_hex = 0;
-while ($line = <$fh_out>) {
-	if ($line =~ /^type=EXECVE /) {
-		if ($line =~ / a0=testing a1=count / ) {
-			($id) = ($line =~ / msg=audit\(.*:([0-9]*)\).* /);
-			seek($fh_out2, 0, 0);
-			system("ausearch -i -k $key -a $id" .
-				" > $stdout2 2> $stderr2");
-			while ($line2 = <$fh_out2>) {
-				if ($line2 =~ /^type=EXECVE /) {
-					$found_count += () =
-						$line2 =~ /a([0-9])*=0/g;
-				}
-			}
-		} elsif ($line =~ / a0=testing a1=size / ) {
-			($id) = ($line =~ / msg=audit\(.*:([0-9]*)\).* /);
-			seek($fh_out2, 0, 0);
-			system("ausearch -i -k $key -a $id" .
-				" > $stdout2 2> $stderr2");
-			while ($line2 = <$fh_out2>) {
-				if ($line2 =~ /^type=EXECVE / &&
-				    $line2 =~ / a2(\[.*\])?=.* /) {
-					my $arg_iter;
-					my $arg_val;
-					($arg_iter,$arg_val) = ($line2 =~
-						/ a2(\[.*\])?=(.*) /);
-					$found_size += length $arg_val;
-				}
-			}
-		} elsif ($line =~ / a0=testing a1=hex / ) {
-			($id) = ($line =~ / msg=audit\(.*:([0-9]*)\).* /);
-			seek($fh_out2, 0, 0);
-			system("ausearch -i -k $key -a $id" .
-				" > $stdout2 2> $stderr2");
-			while ($line2 = <$fh_out2>) {
-				if ($line2 =~ /^type=EXECVE / &&
-				    $line2 =~ / a2(\[.*\])?=.* /) {
-					my $arg_iter;
-					my $arg_val;
-					($arg_iter,$arg_val) = ($line2 =~
-						/ a2(\[.*\])?=(.*) /);
-					$found_hex += length $arg_val;
-				}
-			}
-		}
-	}
+my $found_size  = 0;
+my $found_hex   = 0;
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=EXECVE / ) {
+        if ( $line =~ / a0=testing a1=count / ) {
+            ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            seek( $fh_out2, 0, 0 );
+            system( "ausearch -i -k $key -a $id" . " > $stdout2 2> $stderr2" );
+            while ( $line2 = <$fh_out2> ) {
+                if ( $line2 =~ /^type=EXECVE / ) {
+                    $found_count += () = $line2 =~ /a([0-9])*=0/g;
+                }
+            }
+        }
+        elsif ( $line =~ / a0=testing a1=size / ) {
+            ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            seek( $fh_out2, 0, 0 );
+            system( "ausearch -i -k $key -a $id" . " > $stdout2 2> $stderr2" );
+            while ( $line2 = <$fh_out2> ) {
+                if (   $line2 =~ /^type=EXECVE /
+                    && $line2 =~ / a2(\[.*\])?=.* / )
+                {
+                    my $arg_iter;
+                    my $arg_val;
+                    ( $arg_iter, $arg_val ) =
+                      ( $line2 =~ / a2(\[.*\])?=(.*) / );
+                    $found_size += length $arg_val;
+                }
+            }
+        }
+        elsif ( $line =~ / a0=testing a1=hex / ) {
+            ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            seek( $fh_out2, 0, 0 );
+            system( "ausearch -i -k $key -a $id" . " > $stdout2 2> $stderr2" );
+            while ( $line2 = <$fh_out2> ) {
+                if (   $line2 =~ /^type=EXECVE /
+                    && $line2 =~ / a2(\[.*\])?=.* / )
+                {
+                    my $arg_iter;
+                    my $arg_val;
+                    ( $arg_iter, $arg_val ) =
+                      ( $line2 =~ / a2(\[.*\])?=(.*) / );
+                    $found_hex += length $arg_val;
+                }
+            }
+        }
+    }
 }
-ok($found_count == $test_count);
-ok($found_size == $test_size);
-ok($found_hex == $test_hex);
+ok( $found_count == $test_count );
+ok( $found_size == $test_size );
+ok( $found_hex == $test_hex );
 
 ###
 # cleanup
