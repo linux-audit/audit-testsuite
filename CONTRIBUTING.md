@@ -8,7 +8,32 @@ exceptions to the rules described here, but by following the instructions below
 you should have a much easier time getting your work merged with the upstream
 project.
 
-* Generate the Patch(es)
+## Test Your Code
+
+There are three possible tests you can run to verify your code.  The first
+test is used to check the formatting and coding style of your changes, you
+can run the test with the following command:
+
+	# make check-syntax
+
+... if there are any problems with your changes a diff/patch will be shown
+which indicates the problems and how to fix them.
+
+The second possible test is to test your patch in standalone mode.  You can do
+this by changing to the individual test directory and running the test
+manually:
+
+	# cd tests/<test_dir>
+	# ./test
+
+... there should be no errors when running the test in standalone mode and
+non-harness output should be kept to a minimum.
+
+The third possible test is to run the full test suite as described in the
+documentation.  There should be no errors or non-hardness output in the test
+results.
+
+## Generate the Patch(es)
 
 Depending on how you decided to work with the audit-testsuite code base and
 what tools you are using there are different ways to generate your patch(es).
@@ -31,7 +56,7 @@ When in doubt please generate your patch and try applying it to an unmodified
 copy of the audit-testsuite sources; if it fails for you, it will fail for the
 rest of us.
 
-* Explain Your Work
+## Explain Your Work
 
 At the top of every patch you should include a description of the problem you
 are trying to solve, how you solved it, and why you chose the solution you
@@ -40,7 +65,7 @@ if you can describe/include a reproducer for the problem in the description as
 well as instructions on how to test for the bug and verify that it has been
 fixed.
 
-* Sign Your Work
+## Sign Your Work
 
 The sign-off is a simple line at the end of the patch description, which
 certifies that you wrote it or otherwise have the right to pass it on as an
