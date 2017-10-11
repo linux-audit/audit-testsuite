@@ -1,0 +1,3 @@
+#!/bin/sh
+
+rm /etc/audit/rules.d/tests_manual-syscall_module_path_filter
