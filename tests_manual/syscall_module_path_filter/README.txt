@@ -18,7 +18,7 @@ How to run the test:
 	cd tests_manual/syscall_module_path_filter
 
 2) Set up the test, which adds the
-   tests_manual-syscall_module_path_filter audit rule file to the
+   tests_manual-syscall_module_path_filter.rules audit rule file to the
    /etc/audit/rules.d/ audit rules directory to log all init_module and
    finit_module syscalls and to filter all tracefs and debugfs
    filesystem entries.
@@ -33,7 +33,7 @@ How to run the test:
    this last boot and searches for the number of items listed in the
    syscall record.
 
-	cd tests_manual/syscall_module_path
+	cd tests_manual/syscall_module_path.rules
 	./test
 
    If there are, the test will fail and if ATS_DEBUG is set, it will
