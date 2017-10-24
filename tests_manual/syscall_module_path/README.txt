@@ -17,7 +17,7 @@ How to run the test:
 
 	cd tests_manual/syscall_module_path
 
-2) Set up the test, which adds the tests_manual-syscall_module_path
+2) Set up the test, which adds the tests_manual-syscall_module_path.rules
    audit rule file to the /etc/audit/rules.d/ audit rule directory to
    log all init_module and finit_module syscalls.
 
@@ -38,7 +38,7 @@ How to run the test:
    list which modules cause the records.
 
 5) Restore the config file back to its previous state and delete the
-   audit rule.
+   audit rules.
 
 	./cleanup
 
