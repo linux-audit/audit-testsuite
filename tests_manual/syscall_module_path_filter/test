@@ -35,6 +35,9 @@ $basedir =~ s|(.*)/[^/]*|$1|;
 ###
 # tests
 
+# trigger messages
+system("modprobe nfsv4 >/dev/null 2>&1");
+
 # run the test
 my $line;
 my $uptime;
