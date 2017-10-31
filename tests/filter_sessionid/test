@@ -65,7 +65,10 @@ chomp($pid);
 
 # test for the SYSCALL message
 $result = system(
-"ausearch -i -m SYSCALL -sc open -sc openat -p $pid --session $sessionid -k $key > $stdout 2> $stderr"
+"ausearch -i -m SYSCALL -sc open -p $pid --session $sessionid -k $key > $stdout 2> $stderr"
+);
+$result &= system(
+"ausearch -i -m SYSCALL -sc openat -p $pid --session $sessionid -k $key >> $stdout 2>> $stderr"
 );
 ok( $result, 0 );
 
