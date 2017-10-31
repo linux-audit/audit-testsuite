@@ -10,6 +10,13 @@ init_module and finit_module syscalls, then once the machine is rebooted
 the test script detects SYSCALL records with NULL PATH records along
 with their provoking modules since the most recent boot.
 
+Note: The nfs and nfs4 modules seem to be the easiest way to trigger
+this, so that module must be availabe, loadable to run this test.  If it
+is automatically loaded at boot this is even better, but not necessary,
+since it will be loaded by the test itself.  It won't be unloaded.  It
+also depends on a distro with the nfs/nfs4 module dependancy on tracefs
+or debugfs.
+
 
 How to run the test:
 
