@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "-a always,exit -F arch=b64 -S init_module -S finit_module -k ghak8-mod-load" > /etc/audit/rules.d/tests_manual-syscall_module_path.rules
+

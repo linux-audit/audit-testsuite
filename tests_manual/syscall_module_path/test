@@ -1,0 +1,121 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Temp qw/ tempfile /;
+use Test;
+BEGIN { plan tests => 3 }
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+###
+# setup
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_out2, my $stdout2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err2, my $stderr2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# trigger messages
+system("modprobe nfsv4 >/dev/null 2>&1");
+
+# run the test
+my $line;
+my $uptime;
+system("cat /proc/uptime > $stdout 2> $stderr");
+while ( $line = <$fh_out> ) {
+    ($uptime) = ( $line =~ /^([0-9]*)\..*$/ );
+}
+
+my $boottime = localtime( time - $uptime );
+my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst );
+( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
+  localtime( time - $uptime );
+$year += 1900;
+$mon  += 1;
+my $starttime = "$mon/$mday/$year $hour:$min:$sec";
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    print
+"Checking for module null PATH messages since boottime: $year:$mon:$mday $hour:$min:$sec\n";
+}
+
+system("ausearch -ts $starttime -i --syscall init_module > $stdout 2> $stderr");
+system(
+    "ausearch -ts $starttime -i --syscall finit_module >> $stdout 2>> $stderr");
+
+my $items           = 0;
+my $found_syscall   = 0;
+my $found_spam      = 0;
+my $found_spam_null = 0;
+my $id              = "";
+my $msgtime         = "";
+my $msgdate         = "";
+my $line2;
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+
+while ( $line = <$fh_out> ) {
+
+    # test if we generate any audit records from the filter rule
+    if ( $line =~ /^type=SYSCALL / && $line =~ / items=([0-9]*) / ) {
+        $found_syscall = 1;
+        $items         = $1;
+
+        # test if we generate the PATH record
+        if ( $items > 4 ) {
+            my $found_spam_null_local = 0;
+            $found_spam = 1;
+            ($id)      = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            ($msgdate) = ( $line =~ / msg=audit\(([^ ]*) .*:[0-9]*\).* / );
+            ($msgtime) = ( $line =~ / msg=audit\([^ ]* (.*):[0-9]*\).* / );
+            seek( $fh_out2, 0, 0 );
+            system("ausearch -i -ts $msgdate -a $id >$stdout2 2>$stderr2");
+
+            # test if we generate the PATH record with null name field
+            while ( $line2 = <$fh_out2> ) {
+                if ( $line2 =~ /^type=PATH / && $line2 =~ / name=\(null\) / ) {
+                    $found_spam_null       = 1;
+                    $found_spam_null_local = 1;
+                    last;
+                }
+            }
+            if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+                if ($found_spam_null_local) {
+                    print "  msg ID:$id date:$msgdate time:$msgtime\n";
+                    seek( $fh_out2, 0, 0 );
+                    while ( $line2 = <$fh_out2> ) {
+                        if ( $line2 =~ /^type=PROCTITLE / ) {
+                            $line2 =~ / proctitle=(.*)$/;
+                            print "  Command: \"$1\" with $items PATH items.\n";
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+ok( $found_syscall, 1 ); # Were module syscall records found?
+ok( $found_spam,    1 ); # Were module tracefs or debugfs PATH records detected?
+ok( $found_spam_null, 0 );    # Were no module null PATH records detected?
+
+###
+# cleanup
