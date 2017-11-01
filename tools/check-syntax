@@ -21,10 +21,10 @@
 # along with this library; if not, see <http://www.gnu.org/licenses>.
 #
 
-CHK_C_LIST="$(find tests/ -name "*.c") $(find tests/ -name "*.h")"
+CHK_C_LIST="$(find tests*/ -name "*.c") $(find tests*/ -name "*.h")"
 CHK_C_EXCLUDE=""
 
-CHK_PERL_LIST="$(find tests/ -name "*.pl") $(find tests/ -name "test")"
+CHK_PERL_LIST="$(find tests*/ -name "*.pl") $(find tests*/ -name "test")"
 CHK_PERL_EXCLUDE=""
 
 CHK_PYTHON_LIST="$(find . -name "*.py")"
@@ -52,7 +52,7 @@ function verify_deps() {
 #
 function usage() {
 cat << EOF
-usage: check-syntax [-h] [<files>]
+usage: check-syntax [-h|-f] [<files>]
 
 code syntax checking tool
 optional arguments:
@@ -223,9 +223,6 @@ function fix() {
 # main
 
 verify_deps file
-verify_deps astyle
-verify_deps perltidy
-verify_deps yapf
 
 opt_fix=0
 
@@ -247,6 +244,16 @@ opt_files=$*
 # identify any files passed via the command line
 identify $opt_files
 
+if [[ $CHK_C_LIST != "" ]]; then
+	verify_deps astyle
+fi
+if [[ $CHK_PERL_LIST != "" ]]; then
+	verify_deps perltidy
+fi
+if [[ $CHK_PYTHON_LIST != "" ]]; then
+	verify_deps yapf
+fi
+	
 # process the files
 echo "=============== $(date) ==============="
 echo "Code Syntax Check Results (\"check-syntax $*\")"
