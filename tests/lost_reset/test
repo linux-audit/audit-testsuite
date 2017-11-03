@@ -3,7 +3,7 @@
 use strict;
 use File::Temp qw/ tempdir tempfile /;
 use Test;
-BEGIN { plan tests => 15 }    # 5 + 10 main loop iterations
+BEGIN { plan tests => 5 }
 
 ###
 # functions
@@ -11,8 +11,12 @@ BEGIN { plan tests => 15 }    # 5 + 10 main loop iterations
 ###
 # setup
 
-# reset audit rules
-system("auditctl -D >& /dev/null");
+my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
+  localtime(time);
+$year += 1900;
+$mon  += 1;
+my $startdate = "$year-$mon-$mday";
+my $starttime = "$hour:$min:$sec";
 
 # create stdout/stderr sinks
 ( my $fh_out, my $stdout ) = tempfile(
@@ -21,10 +25,6 @@ system("auditctl -D >& /dev/null");
 );
 ( my $fh_err, my $stderr ) = tempfile(
     TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
-    UNLINK   => 1
-);
-( my $fh_tmp, my $tmpout ) = tempfile(
-    TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
     UNLINK   => 1
 );
 
@@ -37,7 +37,7 @@ system("auditctl -s > $cfgout");
 
 my $result;
 my $i;
-for ( $i = 0 ; $i < 10 ; $i++ ) {    # iteration count of 10
+for ( $i = 0 ; $i < 50 ; $i++ ) {    # iteration count
      # Kill the daemon, set the buffers low, set the wait time to 1ms, turn on auditing
     system("service auditd stop >/dev/null 2>&1");
     system("auditctl -D >/dev/null 2>&1");
@@ -48,48 +48,54 @@ for ( $i = 0 ; $i < 10 ; $i++ ) {    # iteration count of 10
     ###
     # tests
     # Start floodping to generate activity
-    seek( $fh_tmp, 0, 0 );
-    system("ping -f 127.0.0.1 >/dev/null 2>&1 & echo \$! >$tmpout");
-    my $ping_pid = <$fh_tmp>;
+    seek( $fh_out, 0, 0 );
+    system("ping -f 127.0.0.1 >/dev/null 2>&1 & echo \$! >$stdout");
+    my $ping_pid = <$fh_out>;
     chomp($ping_pid);
 
     # Add rule to generate audit queue events from floodping
     $result =
       system("auditctl -a exit,always -S all -F pid=$ping_pid >/dev/null 2>&1");
-    ok( $result, 0 );    # Was the rule added successfully?
-    sleep 1;
+    sleep 2;
     kill 'TERM', $ping_pid;
     system("auditctl -d exit,always -S all -F pid=$ping_pid >/dev/null 2>&1");
 
     # Restart the daemon to collect messages in the log
     system("service auditd start >/dev/null 2>&1");
-    sleep 1;
 }
 
-# send the reset lost message (NOTE: requires bash)
-seek( $fh_tmp, 0, 0 );
-$result = system(
-    "echo \$BASHPID\ >$tmpout; exec auditctl --reset-lost >$stdout 2>$stderr");
+sleep 1;
+
+my $status_lost;
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    seek( $fh_out, 0, 0 );
+    system(
+        "echo -n \"auditctl -s: \" >$stdout; auditctl -s|grep lost >>$stdout");
+    $status_lost = <$fh_out>;
+}
+
+# send the reset lost message
+seek( $fh_out, 0, 0 );
+$result = system("auditctl --reset-lost >$stdout 2>$stderr");
 ok( $result, 0 );    # Was the reset command successful?
-my $reset_lost_pid = <$fh_tmp>;
-chomp($reset_lost_pid);
-my $reset_err = <$fh_err>;
-$reset_err =~ /lost: ([0-9]+)/;
-my $result_lost = $1;
-ok( $result_lost > 0 );    # Was the lost value non-zero?
+<$fh_err> =~ /lost: ([0-9]+)/;
+my $reset_rc = $1;
+ok( $reset_rc > 0 );    # Was the lost value non-zero?
 
 sleep 1;
 
 # find the config change event
 seek( $fh_out, 0, 0 );
 seek( $fh_err, 0, 0 );
-$result = system("ausearch -ts recent -i -m CONFIG_CHANGE >$stdout 2>$stderr");
-ok( $result, 0 );          # Was an event found?
+$result = system(
+"LC_TIME=\"en_DK.utf8\" ausearch --start $startdate $starttime -i -m CONFIG_CHANGE >$stdout 2>$stderr"
+);
+ok( $result, 0 );       # Was an event found?
 
 # test if we generate the lost reset record correctly
 my $line;
 my $found_msg = 0;
-my $lost      = 0;
+my $reset_msg = 0;
 while ( $line = <$fh_out> ) {
 
     # find the CONFIG_CHANGE record
@@ -97,20 +103,22 @@ while ( $line = <$fh_out> ) {
 
         # find the lost value
         if ( $line =~ / lost=0 old=([0-9]+) / ) {
-            $lost      = $1;
+            $reset_msg = $1;
             $found_msg = 1;
         }
     }
 }
 ok( $found_msg, 1 );    # Was the message well-formed?
-ok( $result_lost == $lost );    # Do the two lost values agree?
+ok( $reset_rc == $reset_msg );    # Do the two lost values agree?
 
 if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
-    if ( !$result_lost || !$lost || $result_lost != $lost ) {
-        print "lost_rc: $result_lost\n";
-        print "lost_msg: $lost\n";
+    if ( !$reset_rc || !$reset_msg || $reset_rc != $reset_msg ) {
+        print "status_lost: $status_lost";
+        print "reset_rc: $reset_rc\n";
+        print "reset_msg: $reset_msg\n";
         print "loop completed $i times\n";
     }
+    else { print "reset_msg $reset_msg\n"; }
 }
 
 ###
