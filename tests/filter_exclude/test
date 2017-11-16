@@ -53,99 +53,118 @@ my $euid     = 0;
 my $obj_user = "system_u";
 
 # get selinux labels
-my ( $subj_user, $subj_role, $subj_type, $subj_sen, $subj_clr );
+my ( $selinux_user, $selinux_role, $selinux_type, $selinux_mls, $subj_sen, $subj_clr );
 $result = system("id -Z >$subjout 2>/dev/null");
-ok( $result, 0 );
+ok( $result, 0 ); # found selinux context?
 my $subj = <$fh_subj>;
 chomp($subj);
-if ( $subj =~ /([^:]+):([^:]+):([^:]+):([^-]+)-([^-]+)/ ) {
-    ( $subj_user, $subj_role, $subj_type, $subj_sen, $subj_clr ) =
-      ( $1, $2, $3, $4, $5 );
+if ( $subj =~ /([^:]+):([^:]+):([^:]+):(.+)/ ) {
+    ( $selinux_user, $selinux_role, $selinux_type, $selinux_mls ) =
+      ( $1, $2, $3, $4 );
+}
+$subj_sen = $selinux_mls;
+if ( $selinux_mls =~ /([^-]+)-([^-]+)/ ) {
+    ( $subj_sen, $subj_clr ) =
+      ( $1, $2 );
+} else {
+    $subj_clr = "";
 }
 
 # try adding rule for each supported field type and test for (a few)
 # unsupported types
 $result = system("auditctl -a exclude,always -F msgtype=$msgtype");
-ok( $result, 0 );
+ok( $result, 0 ); # add msgtype ok?
 system("auditctl -d exclude,always -F msgtype=$msgtype");
 $result = system("auditctl -a exclude,always -F pid=$pid");
-ok( $result, 0 );
+ok( $result, 0 ); # add pid ok?
 system("auditctl -d exclude,always -F pid=$pid");
 $result = system("auditctl -a exclude,always -F uid=$uid");
-ok( $result, 0 );
+ok( $result, 0 ); # add uid ok?
 system("auditctl -d exclude,always -F uid=$uid");
 $result = system("auditctl -a exclude,always -F gid=$gid");
-ok( $result, 0 );
+ok( $result, 0 ); # add gid ok?
 system("auditctl -d exclude,always -F gid=$gid");
 $result = system("auditctl -a exclude,always -F auid=$auid");
-ok( $result, 0 );
+ok( $result, 0 ); # add auid ok?
 system("auditctl -d exclude,always -F auid=$auid");
-$result = system("auditctl -a exclude,always -F subj_user=$subj_user");
-ok( $result, 0 );
-system("auditctl -d exclude,always -F subj_user=$subj_user");
-$result = system("auditctl -a exclude,always -F subj_role=$subj_role");
-ok( $result, 0 );
-system("auditctl -d exclude,always -F subj_role=$subj_role");
-$result = system("auditctl -a exclude,always -F subj_type=$subj_type");
-ok( $result, 0 );
-system("auditctl -d exclude,always -F subj_type=$subj_type");
+$result = system("auditctl -a exclude,always -F subj_user=$selinux_user");
+ok( $result, 0 ); # add subj_user ok?
+system("auditctl -d exclude,always -F subj_user=$selinux_user");
+$result = system("auditctl -a exclude,always -F subj_role=$selinux_role");
+ok( $result, 0 ); # add subj_role ok?
+system("auditctl -d exclude,always -F subj_role=$selinux_role");
+$result = system("auditctl -a exclude,always -F subj_type=$selinux_type");
+ok( $result, 0 ); # add subj_type ok?
+system("auditctl -d exclude,always -F subj_type=$selinux_type");
 $result = system("auditctl -a exclude,always -F subj_sen=$subj_sen");
-ok( $result, 0 );
+ok( $result, 0 ); # add subj_sen ok?
 system("auditctl -d exclude,always -F subj_sen=$subj_sen");
-$result = system("auditctl -a exclude,always -F subj_clr=$subj_clr");
-ok( $result, 0 );
-system("auditctl -d exclude,always -F subj_clr=$subj_clr");
-
+$result = system("auditctl -a exclude,always -F subj_clr=\"$subj_clr\"");
+ok( $result, 0 ); # add subj_clr ok?
+system("auditctl -d exclude,always -F subj_clr=\"$subj_clr\"");
 $result = system("auditctl -a exclude,always -F ppid=$ppid >/dev/null 2>&1");
-ok( $result ne 0 );
+ok( $result ne 0 ); # add ppid ok?
 system("auditctl -d exclude,always -F ppid=$ppid >/dev/null 2>&1");
 $result = system("auditctl -a exclude,always -F euid=$euid >/dev/null 2>&1");
-ok( $result ne 0 );
+ok( $result ne 0 ); # add euid ok?
 system("auditctl -d exclude,always -F euid=$euid >/dev/null 2>&1");
-$result =
-  system("auditctl -a exclude,always -F obj_user=$obj_user >/dev/null 2>&1");
-ok( $result ne 0 );
+$result = system("auditctl -a exclude,always -F obj_user=$obj_user >/dev/null 2>&1");
+ok( $result ne 0 ); # add obj_user ok?
 system("auditctl -d exclude,always -F obj_user=$obj_user >/dev/null 2>&1");
 
 $result = system(
-"auditctl -a exclude,always -F msgtype=$msgtype -F pid=$pid -F uid=$uid -F gid=$gid -F auid=$auid -F subj_user=$subj_user -F subj_role=$subj_role -F subj_type=$subj_type -F subj_sen=$subj_sen -F subj_clr=$subj_clr"
+"auditctl -a exclude,always -F msgtype=$msgtype -F pid=$pid -F uid=$uid -F gid=$gid -F auid=$auid -F subj_user=$selinux_user -F subj_role=$selinux_role -F subj_type=$selinux_type -F subj_sen=$subj_sen -F subj_clr=\"$subj_clr\""
 );
-ok( $result, 0 );
+ok( $result, 0 ); # add syscall exclude ok?
 
 $result = system(
-    "auditctl -a exit,always -F arch=b$ENV{MODE} -S all -F path=/tmp/$key");
-ok( $result, 0 );
+    "auditctl -a exit,always -F arch=b$ENV{MODE} -S all -F path=/tmp/$key -F key=$key");
+ok( $result, 0 ); # add file watch ok?
 
 open( my $tmpfile, ">", "/tmp/$key" );
 close($tmpfile);
 
 # test for the SYSCALL message provoked by creat
-$result = system(
-"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj_user:$subj_role:$subj_type:$subj_sen-$subj_clr -ts recent > $stdout 2> /dev/null"
-);
-ok( $result, 256 );
+if ( $subj_clr eq "" ) {
+    $result = system(
+    "ausearch -i -m SYSCALL -sc creat -p $pid -ui $uid -gi $gid -ul $auid -su $selinux_user:$selinux_role:$selinux_type:$subj_sen -ts recent -F key=$key > $stdout 2> /dev/null"
+    );
+} else {
+    $result = system(
+    "ausearch -i -m SYSCALL -sc creat -p $pid -ui $uid -gi $gid -ul $auid -su $selinux_user:$selinux_role:$selinux_type:$subj_sen-$subj_clr -ts recent -F key=$key > $stdout 2> /dev/null"
+    );
+}
+ok( $result, 256 ); # creat message not found?
 
 my $found_msg = 0;
 my $line;
 while ( $line = <$fh_out> ) {
     $found_msg = 1;
 }
-ok( $found_msg, 0 );
+ok( $found_msg, 0 ); # add pid ok?
 
 $result = system(
-"auditctl -d exclude,always -F msgtype=$msgtype -F pid=$pid -F uid=$uid -F gid=$gid -F auid=$auid -F subj_user=$subj_user -F subj_role=$subj_role -F subj_type=$subj_type -F subj_sen=$subj_sen -F subj_clr=$subj_clr"
+"auditctl -d exclude,always -F msgtype=$msgtype -F pid=$pid -F uid=$uid -F gid=$gid -F auid=$auid -F subj_user=$selinux_user -F subj_role=$selinux_role -F subj_type=$selinux_type -F subj_sen=$subj_sen -F subj_clr=\"$subj_clr\""
 );
-ok( $result, 0 );
+ok( $result, 0 ); # rule deleted ok?
 
 unlink "/tmp/$key";
 
 system("sync");
 
+system("auditctl -d exit,always -F arch=b$ENV{MODE} -S all -F path=/tmp/$key -F key=$key");
+
 # test for the SYSCALL message provoked by unlink
-$result = system(
-"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj_user:$subj_role:$subj_type:$subj_sen-$subj_clr -ts recent > $stdout2 2> /dev/null"
-);
-ok( $result, 0 );
+if ( $subj_clr eq "" ) {
+    $result = system(
+    "ausearch -i -m SYSCALL -sc unlink -p $pid -ui $uid -gi $gid -ul $auid -su $selinux_user:$selinux_role:$selinux_type:$subj_sen -ts recent -k $key > $stdout2 2> /dev/null"
+    );
+} else {
+    $result = system(
+    "ausearch -i -m SYSCALL -sc unlink -p $pid -ui $uid -gi $gid -ul $auid -su $selinux_user:$selinux_role:$selinux_type:$subj_sen-$subj_clr -ts recent -k $key > $stdout2 2> /dev/null"
+    );
+}
+ok( $result, 0 ); # found unlink message?
 
 $found_msg = 0;
 while ( $line = <$fh_out2> ) {
@@ -157,7 +176,7 @@ while ( $line = <$fh_out2> ) {
         }
     }
 }
-ok( $found_msg, 1 );
+ok( $found_msg, 1 ); #found unlink message?
 
 ###
 # cleanup
