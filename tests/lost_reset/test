@@ -3,7 +3,7 @@
 use strict;
 use File::Temp qw/ tempdir tempfile /;
 use Test;
-BEGIN { plan tests => 15 }    # 5 + 10 main loop iterations
+BEGIN { plan tests => 17 }    # 7 + 10 main loop iterations
 
 ###
 # functions
@@ -12,7 +12,7 @@ BEGIN { plan tests => 15 }    # 5 + 10 main loop iterations
 # setup
 
 # reset audit rules
-system("auditctl -D >& /dev/null");
+system("auditctl -D >/dev/null 2>&1");
 
 # create stdout/stderr sinks
 ( my $fh_out, my $stdout ) = tempfile(
@@ -28,7 +28,20 @@ system("auditctl -D >& /dev/null");
     UNLINK   => 1
 );
 
+# System defaults that will need to be restored after test
 my $result;
+$result =
+  system("auditctl -s|grep backlog_wait_time|sed -e 's/[^ ]* //'>$stdout");
+ok( $result, 0 );    # Was the backlog_wait_time found?
+my $backlog_wait_time = <$fh_out>;
+chomp($backlog_wait_time);
+seek( $fh_out, 0, 0 );
+$result = system("auditctl -s|grep backlog_limit|sed -e 's/[^ ]* //'>$stdout");
+ok( $result, 0 );    # Was the backlog_limit found?
+my $backlog_limit = <$fh_out>;
+chomp($backlog_limit);
+seek( $fh_out, 0, 0 );
+
 my $i;
 for ( $i = 0 ; $i < 10 ; $i++ ) {    # iteration count of 10
      # Kill the daemon, set the buffers low, set the wait time to 1ms, turn on auditing
@@ -108,4 +121,6 @@ if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
 
 ###
 # cleanup
+system("auditctl --backlog_wait_time $backlog_wait_time >/dev/null 2>&1");
+system("auditctl -b $backlog_limit >/dev/null 2>&1");
 system("service auditd restart 2>/dev/null");
