@@ -1,0 +1,72 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Temp qw/ tempfile /;
+use Test;
+BEGIN { plan tests => 2 }
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+sub key_gen {
+	my @chars = ("A".."Z", "a".."z");
+	my $key = "testsuite-" . time . "-";
+	$key .= $chars[rand @chars] for 1..8;
+	return $key;
+}
+
+###
+# setup
+
+# create stdout/stderr sinks
+(my $fh_out, my $stdout) = tempfile(TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+				    UNLINK => 1);
+(my $fh_err, my $stderr) = tempfile(TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+				    UNLINK => 1);
+my $key = key_gen();
+my $testdir = "/tmp/$key";
+my $testfile = "/tmp/$key/test.txt";
+mkdir $testdir;
+
+system("auditctl -a always,exit -F arch=b64 -S open -F dir=$testdir -k $key-1");
+system("auditctl -a always,exit -F arch=b64 -S open -F path=$testfile -k $key-2");
+
+system("grep cred_jar /proc/slabinfo | awk '{print \$2}' > $stdout 2> $stderr");
+my $line;
+my $cred_jar_start;
+while ($line = <$fh_out>) {
+	($cred_jar_start) = ($line =~ /^([0-9]+)$/);
+}
+
+###
+# tests
+
+# run the test
+my $iterations = 10000;
+system("for i in \$(seq 1 $iterations);do touch $testfile; done");
+sleep 2;
+
+seek($fh_out, 0, 0);
+seek($fh_err, 0, 0);
+system("grep cred_jar /proc/slabinfo | awk '{print \$2}' > $stdout 2> $stderr");
+my $cred_jar_end;
+while ($line = <$fh_out>) {
+	($cred_jar_end) = ($line =~ /^([0-9]+)$/);
+}
+
+my $leak = ($cred_jar_start + $iterations) <= $cred_jar_end;
+ok(!$leak); # Is there a leak?
+if($leak) {
+	print "Memory leaked to cred_jar:$cred_jar_start:$cred_jar_end\n";
+}
+
+###
+# cleanup
+system("auditctl -d always,exit -F arch=b64 -S open -F dir=$testdir -k $key-1");
+system("auditctl -d always,exit -F arch=b64 -S open -F path=$testfile -k $key-2");
+
+unlink $testfile;
+rmdir $testdir;
