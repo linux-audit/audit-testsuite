@@ -1,0 +1,104 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 4 }
+
+use IPC::Open3;
+use File::Temp qw/ tempfile unlink0 /;
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+# SETUP
+# =====
+
+# Clean audit rules.
+system("auditctl -D >& /dev/null");
+
+# Create sinks.
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+# Create test rule.
+my $key      = key_gen();
+my $testfile = "/tmp/$key";
+system("auditctl -w $testfile -k $key");
+
+# Start fanotify watcher in the background.
+my $fanotify_pid = open3( undef, undef, undef, "$basedir/fanotify /tmp" );
+sleep 3;
+
+# TRIGGER
+# =======
+
+# Open testfile to trigger fanotify events.
+open( my $fh_test, ">", $testfile );
+close($fh_test);
+
+# CLEAN-UP
+# ========
+
+# Stop fanotify watcher.
+if ( $fanotify_pid > 0 ) {
+    eval {
+        local $SIG{ALRM} = sub { kill 9, $fanotify_pid; };
+        alarm 6;
+        waitpid( $fanotify_pid, 0 );
+        alarm 0;
+    };
+}
+
+# Empty rules.
+system("auditctl -D >& /dev/null");
+
+# Remove testfile.
+unlink0( $fh_test, $testfile );
+
+# VERIFY
+# ======
+
+# Check that filter rule generated some events.
+my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+
+# Some events were triggered.
+ok( $result == 0 );
+
+# Check that correct events were generated.
+my $fanotify_found = 0;
+my $syscall_found  = 0;
+my $path_found     = 0;
+while ( my $line = <$fh_out> ) {
+    if ( $line =~ /^type=FANOTIFY .* resp=allow/ ) {
+        $fanotify_found = 1;
+    }
+    elsif ( $line =~ /^type=SYSCALL .* syscall=open(at)? success=yes/ ) {
+        $syscall_found = 1;
+    }
+    elsif ( $line =~ /^type=PATH .* name=$testfile/ ) {
+        $path_found = 1;
+    }
+}
+
+# FANOTIFY event was found.
+ok( $fanotify_found == 1 );
+
+# SYSCALL event was found.
+ok( $syscall_found == 1 );
+
+# PATH event was found.
+ok( $path_found == 1 );
