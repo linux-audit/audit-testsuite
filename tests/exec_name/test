@@ -3,7 +3,7 @@
 use strict;
 
 use Test;
-BEGIN { plan tests => 5 }
+BEGIN { plan tests => 29 }
 
 use File::Temp qw/ tempfile /;
 
@@ -20,25 +20,32 @@ sub key_gen {
 ###
 # setup
 
-# try to find two test executables
-my ( $exec, $exec2 );
+# try to find three test executables
+my @execs = ("") x 3;
 
 if ( -x "/usr/bin/id" ) {
-    $exec = "/usr/bin/id";
+    $execs[0] = "/usr/bin/id";
 }
 elsif ( -x "/bin/id" ) {
-    $exec = "/bin/id";
+    $execs[0] = "/bin/id";
 }
 
 if ( -x "/usr/bin/echo" ) {
-    $exec2 = "/usr/bin/echo";
+    $execs[1] = "/usr/bin/echo";
 }
 elsif ( -x "/bin/echo" ) {
-    $exec2 = "/bin/echo";
+    $execs[1] = "/bin/echo";
+}
+
+if ( -x "/usr/bin/ls" ) {
+    $execs[2] = "/usr/bin/ls";
+}
+elsif ( -x "/bin/ls" ) {
+    $execs[2] = "/bin/ls";
 }
 
 # see if we found the test executables
-ok( $exec ne "" and $exec2 ne "" );
+ok( $execs[0] ne "" and $execs[1] ne "" and $execs[2] ne "" );
 
 # create stdout/stderr sinks
 ( my $fh_out, my $stdout ) = tempfile(
@@ -51,49 +58,87 @@ ok( $exec ne "" and $exec2 ne "" );
 );
 
 sub do_test {
-    my $rule = shift(@_);
+    my ( $exit, $exclude ) = @_;
 
     # reset audit
     system("auditctl -D >& /dev/null");
 
     # set the audit-by-executable filter
-    my $key = key_gen();
-    system(
-        "auditctl -a always,exit -F $rule -F arch=b64 -S exit_group -k $key");
+    my @expected = (0) x scalar @execs;
+    my $key      = key_gen();
+    foreach ( @{$exit} ) {
+        my $op  = %$_{op};
+        my $exe = %$_{exe};
+        if ( $op eq "=" ) {
+            $expected[$exe] = 1;
+        }
+        else {
+            for ( 0 .. $#execs ) {
+                $expected[$_] = 1 if $_ != $exe;
+            }
+        }
+        system( "auditctl -a always,exit -F exe$op$execs[$exe] "
+              . "-F arch=b64 -S exit_group -k $key" );
+    }
 
-    # run the watched executable
-    system("$exec > /dev/null 2> /dev/null");
+    # add a universal rule if no exit filters given
+    if ( scalar @{$exit} == 0 ) {
+        @expected = (1) x scalar @execs;
+        system("auditctl -a always,exit -F arch=b64 -S exit_group -k $key");
+    }
 
-    # run a different executable
-    system("$exec2 > /dev/null 2> /dev/null");
+    foreach ( @{$exclude} ) {
+        my $op  = %$_{op};
+        my $exe = %$_{exe};
+        if ( $op eq "=" ) {
+            $expected[$exe] = 0;
+        }
+        else {
+            for ( 0 .. $#execs ) {
+                $expected[$_] = 0 if $_ != $exe;
+            }
+        }
+        system("auditctl -a always,exclude -F exe$op$execs[$exe]");
+    }
+
+    # run the executables
+    system("$_ > /dev/null 2> /dev/null") for (@execs);
 
     # test if we generate any audit records from the filter rule
     my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
     ok( $result, 0 );
 
-    # test if we generate the SYSCALL record correctly
+    # test if we generate the SYSCALL records correctly
     my $line;
-    my $found_exec  = 0;
-    my $found_exec2 = 0;
+    my @found = (0) x scalar @execs;
     seek( $fh_out, 0, 0 );
     seek( $fh_err, 0, 0 );
     while ( $line = <$fh_out> ) {
 
         # test if we generate a SYSCALL record
         if ( $line =~ /^type=SYSCALL / ) {
-            if ( $line =~ / exe=$exec / ) {
-                $found_exec = 1;
-            }
-            elsif ( $line =~ / exe=$exec2 / ) {
-                $found_exec2 = 1;
+            for ( 0 .. $#execs ) {
+                if ( $line =~ / exe=$execs[$_] / ) {
+                    $found[$_] = 1;
+                    last;
+                }
             }
         }
     }
-    ok( $found_exec and not $found_exec2 );
+    for ( 0 .. $#execs ) {
+        ok( $found[$_] == $expected[$_] );
+    }
 }
 
-do_test("exe=$exec");
-do_test("exe!=$exec2");
+do_test( [ { exe => 0, op => "=" } ],  [] );
+do_test( [ { exe => 1, op => "!=" } ], [] );
+do_test( [], [ { exe => 0, op => "!=" } ] );
+do_test( [], [ { exe => 1, op => "=" } ] );
+
+do_test( [ { exe => 1, op => "!=" } ], [ { exe => 2, op => "=" } ] );
+
+do_test( [ { exe => 0, op => "=" }, { exe => 1, op => "=" } ], [] );
+do_test( [], [ { exe => 0, op => "=" }, { exe => 1, op => "=" } ] );
 
 ###
 # cleanup
