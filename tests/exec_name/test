@@ -3,7 +3,7 @@
 use strict;
 
 use Test;
-BEGIN { plan tests => 3 }
+BEGIN { plan tests => 5 }
 
 use File::Temp qw/ tempfile /;
 
@@ -20,23 +20,25 @@ sub key_gen {
 ###
 # setup
 
-# try to find a test executable
-my $exec;
+# try to find two test executables
+my ( $exec, $exec2 );
+
 if ( -x "/usr/bin/id" ) {
     $exec = "/usr/bin/id";
 }
 elsif ( -x "/bin/id" ) {
     $exec = "/bin/id";
 }
-elsif ( -x "/usr/bin/echo" ) {
-    $exec = "/usr/bin/echo";
+
+if ( -x "/usr/bin/echo" ) {
+    $exec2 = "/usr/bin/echo";
 }
 elsif ( -x "/bin/echo" ) {
-    $exec = "/bin/echo";
+    $exec2 = "/bin/echo";
 }
 
-# reset audit
-system("auditctl -D >& /dev/null");
+# see if we found the test executables
+ok( $exec  ne "" and $exec2 ne "" );
 
 # create stdout/stderr sinks
 ( my $fh_out, my $stdout ) = tempfile(
@@ -48,36 +50,49 @@ system("auditctl -D >& /dev/null");
     UNLINK   => 1
 );
 
-###
-# tests
+sub do_test {
+    my $rule = shift(@_);
 
-# see if we found a test executable
-ok( $exec ne "" );
+    # reset audit
+    system("auditctl -D >& /dev/null");
 
-# set the audit-by-executable filter
-my $key = key_gen();
-system("auditctl -a always,exit -S all -F exe=$exec -k $key");
+    # set the audit-by-executable filter
+    my $key = key_gen();
+    system("auditctl -a always,exit -F $rule -F arch=b64 -S exit_group -k $key");
 
-# run the watched executable
-system("$exec > /dev/null 2> /dev/null");
+    # run the watched executable
+    system("$exec > /dev/null 2> /dev/null");
 
-# test if we generate any audit records from the filter rule
-my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
-ok( $result, 0 );
+    # run a different executable
+    system("$exec2 > /dev/null 2> /dev/null");
 
-# test if we generate the SYSCALL record correctly
-my $line;
-my $found_syscall = 0;
-while ( $line = <$fh_out> ) {
+    # test if we generate any audit records from the filter rule
+    my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+    ok( $result, 0 );
 
-    # test if we generate a SYSCALL record
-    if ( $line =~ /^type=SYSCALL / ) {
-        if ( $line =~ / exe=$exec / ) {
-            $found_syscall = 1;
+    # test if we generate the SYSCALL record correctly
+    my $line;
+    my $found_exec = 0;
+    my $found_exec2 = 0;
+    seek( $fh_out, 0, 0 );
+    seek( $fh_err, 0, 0 );
+    while ( $line = <$fh_out> ) {
+
+        # test if we generate a SYSCALL record
+        if ( $line =~ /^type=SYSCALL / ) {
+            if ( $line =~ / exe=$exec / ) {
+                $found_exec = 1;
+            }
+            elsif ( $line =~ / exe=$exec2 / ) {
+                $found_exec2 = 1;
+            }
         }
     }
+    ok($found_exec and not $found_exec2);
 }
-ok($found_syscall);
+
+do_test("exe=$exec");
+do_test("exe!=$exec2");
 
 ###
 # cleanup
