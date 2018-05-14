@@ -3,7 +3,7 @@
 use strict;
 
 use Test;
-BEGIN { plan tests => 3 }
+BEGIN { plan tests => 4 }
 
 use File::Temp qw/ tempdir tempfile /;
 
@@ -56,10 +56,11 @@ my $key = key_gen();
 $result = system(
 "auditctl -a always,exit -F arch=b64 -F path=/tmp/$key -F sessionid=$sessionid -k $key"
 );
-ok( $result, 0 );
+ok( $result, 0 ); # rule accepted?
 
 # send the userspace message (NOTE: requires bash)
-system("echo \$\$ > $pidout; exec touch /tmp/$key");
+$result = system("echo \$\$ > $pidout; exec touch /tmp/$key");
+ok( $result, 0 ); # echo/touch succeeded?
 my $pid = <$fh_pid>;
 chomp($pid);
 
@@ -70,7 +71,12 @@ $result = system(
 $result &= system(
 "ausearch -i -m SYSCALL -sc openat -p $pid --session $sessionid -k $key >> $stdout 2>> $stderr"
 );
-ok( $result, 0 );
+ok( $result, 0 ); # open or openat SYSCALL record found?
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    if ( $result ) {
+        print "failed to find open(at) SYSCALL record with pid=$pid ses=$sessionid key=$key\n";
+    }
+}
 
 # test if we generate the SYSCALL record correctly
 my $line;
@@ -87,7 +93,7 @@ while ( $line = <$fh_out> ) {
         last;
     }
 }
-ok($syscall_msg_match);
+ok($syscall_msg_match); # SYSCALL record with matching pid/ses/key found?
 
 ###
 # cleanup
