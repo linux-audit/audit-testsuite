@@ -108,4 +108,6 @@ if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
 
 ###
 # cleanup
-system("service auditd restart 2>/dev/null");
+system("service auditd stop 2>/dev/null");
+system("rm -f /var/log/audit/audit.log.*");
+system("service auditd start 2>/dev/null");
