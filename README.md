@@ -32,7 +32,8 @@ please follow the instructions below.
 	              perl-Test \
 	              perl-Test-Harness \
 	              perl-File-Which \
-	              perl-Time-HiRes
+	              perl-Time-HiRes \
+	              nmap-ncat
 
 ### Fedora
 
@@ -44,14 +45,16 @@ please follow the instructions below.
 	              perl-Test \
 	              perl-Test-Harness \
 	              perl-File-Which \
-	              perl-Time-HiRes
+	              perl-Time-HiRes \
+	              nmap-ncat
 
 ### Debian Based Systems
 
 	# apt-get install auditd \
 	                  build-essential \
 	                  libc6-i386 \
-	                  perl-modules
+	                  perl-modules \
+	                  netcat
 
 ## Execution
 
