@@ -1,0 +1,179 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 1 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+# Run stat on random files in subtrees to generate audit events
+sub run_stat {
+    my ( $dir, $dirs ) = @_;
+    my $path;
+
+    while (1) {
+        $path =
+          "$dir/mnt/mnt" . int( rand($dirs) ) . "/subdir" . int( rand($dirs) );
+        stat($path);
+    }
+}
+
+# Generate audit rules for subtrees. Do one rule per subtree. Because watch
+# recursively iterates child mounts and we mount $dir/leaf$i under various
+# subtrees, the inode corresponding to $dir/leaf$i gets tagged by different
+# trees.
+sub run_mark_audit {
+    my ( $dir, $dirs, $key ) = @_;
+
+    while (1) {
+        for ( my $i = 0 ; $i < $dirs ; $i++ ) {
+            system("auditctl -w $dir/mnt/mnt$i -p r -k $key");
+        }
+        system("auditctl -D -k $key >& /dev/null");
+    }
+}
+
+sub umount_all {
+    my ( $dir, $dirs, $ignore_fail ) = @_;
+
+    for ( my $i = 0 ; $i < $dirs ; $i++ ) {
+        while ( system("umount $dir/leaf$i >& /dev/null") > 0
+            && $ignore_fail == 0 )
+        {
+            # Nothing - loop until umount succeeds
+        }
+    }
+    for ( my $i = 0 ; $i < $dirs ; $i++ ) {
+        for ( my $j = 0 ; $j < $dirs ; $j++ ) {
+            while ( system("umount $dir/mnt/mnt$i/subdir$j >& /dev/null") > 0
+                && $ignore_fail == 0 )
+            {
+                # Nothing - loop until umount succeeds
+            }
+        }
+        while ( system("umount $dir/mnt/mnt$i >& /dev/null") > 0
+            && $ignore_fail == 0 )
+        {
+            # Nothing - loop until umount succeeds
+        }
+    }
+}
+
+# Mount and unmount filesystems. We pick random leaf mount so that sometimes
+# a leaf mount point root inode will gather more tags from different trees
+# and sometimes we will be quicker in unmounting all instances of leaf and
+# thus excercise inode evistion path
+sub run_mount {
+    my ( $dir, $dirs ) = @_;
+
+    while (1) {
+
+        # We use tmpfs here and not just bind mounts of some dir so
+        # that the root inode gets evicted once all instances are
+        # unmounted.
+        for ( my $i = 0 ; $i < $dirs ; $i++ ) {
+            system("mount -t tmpfs none $dir/leaf$i");
+        }
+        for ( my $i = 0 ; $i < $dirs ; $i++ ) {
+            system("mount --bind $dir/dir$i $dir/mnt/mnt$i");
+            for ( my $j = 0 ; $j < $dirs ; $j++ ) {
+                my $leaf = "$dir/leaf" . int( rand($dirs) );
+                system("mount --bind $leaf $dir/mnt/mnt$i/subdir$j");
+            }
+        }
+        umount_all( $dir, $dirs, 0 );
+    }
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create temp directory
+my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+my $dirs = 4;
+
+# setup directory hierarchy
+for ( my $i = 0 ; $i < $dirs ; $i++ ) {
+    mkdir $dir . "/dir" . $i;
+    for ( my $j = 0 ; $j < $dirs ; $j++ ) {
+        mkdir $dir . "/dir" . $i . "/subdir" . $j;
+    }
+}
+mkdir "$dir/mnt";
+for ( my $i = 0 ; $i < $dirs ; $i++ ) {
+    mkdir "$dir/mnt/mnt$i";
+    mkdir "$dir/leaf$i";
+}
+
+my $stat_pid = fork();
+
+if ( $stat_pid == 0 ) {
+    run_stat( $dir, $dirs );
+
+    # Never reached
+    exit;
+}
+
+my $mount_pid = fork();
+
+if ( $mount_pid == 0 ) {
+    run_mount( $dir, $dirs );
+
+    # Never reached
+    exit;
+}
+
+my $key = key_gen();
+
+my $audit_pid = fork();
+
+if ( $audit_pid == 0 ) {
+    run_mark_audit( $dir, $dirs, $key );
+
+    # Never reached
+    exit;
+}
+
+# Sleep for a minute to let stress test run...
+sleep(60);
+ok(1);
+
+###
+# cleanup
+
+kill( 'KILL', $stat_pid, $mount_pid, $audit_pid );
+
+# Wait for children to terminate
+waitpid( $stat_pid,  0 );
+waitpid( $mount_pid, 0 );
+waitpid( $audit_pid, 0 );
+system("auditctl -D >& /dev/null");
+umount_all( $dir, $dirs, 1 );
