@@ -1,0 +1,99 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 4 }
+
+use File::Temp qw/ tempfile /;
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_out2, my $stdout2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err2, my $stderr2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# set the audit-by-executable filter
+my $result = system("autrace /bin/ls \"\" \"/etc\" > $stdout 2> $stderr ");
+ok( $result, 0 );
+my $line;
+my $pid;
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^Trace complete. .*/ ) {
+        ($pid) = ( $line =~ / \'ausearch -i -p ([0-9]*)\'/ );
+    }
+}
+
+# test parameters
+
+# run the tests
+
+# test if we generate any audit records from the filter rule
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+$result = system("ausearch -ts recent -i -m execve > $stdout 2> $stderr");
+ok( $result, 0 );
+
+# test if we generate the EXECVE records correctly
+my $line2;
+my $id;
+my $found_ok = 0;
+my $found_nok  = 0;
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=EXECVE / ) {
+        if ( $line =~ / a0=\/bin\/ls a1= a2=\/etc / ) {
+            ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            seek( $fh_out2, 0, 0 );
+            system( "ausearch -i -m execve -p $pid -a $id" . " > $stdout2 2> $stderr2" );
+            while ( $line2 = <$fh_out2> ) {
+                if ( $line2 =~ /^type=EXECVE / ) {
+                    $found_ok += 1;
+                }
+            }
+        }
+        elsif ( $line =~ / a0=\/bin\/ls a2=\/etc / ) {
+            ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            seek( $fh_out2, 0, 0 );
+            system( "ausearch -i -m execve -p $pid -a $id" . " > $stdout2 2> $stderr2" );
+            while ( $line2 = <$fh_out2> ) {
+                if ( $line2 =~ /^type=EXECVE / ) {
+                    $found_nok += 1;
+                }
+            }
+        }
+    }
+}
+ok( $found_ok == 1 );
+ok( $found_nok == 0 );
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");

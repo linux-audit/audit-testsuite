@@ -6,6 +6,7 @@ MODE := $(shell [ $(shell uname -i) == "i386" ] && echo "32" || echo "64")
 
 TESTS := \
 	exec_execve \
+	exec_execve_blank \
 	exec_name \
 	file_create \
 	file_delete \
