@@ -82,7 +82,7 @@ while ( $line = <$fh_out> ) {
 
     # test if we generate a SYSCALL record
     if ( $line =~ /^type=SYSCALL / ) {
-        if ( $line =~ / syscall=rename / and $line =~ / success=yes / ) {
+        if ( $line =~ / syscall=rename(at)? / and $line =~ / success=yes / ) {
             $found_syscall = 1;
         }
     }

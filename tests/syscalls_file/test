@@ -39,20 +39,21 @@ my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
 ###
 # tests
 
-my $result;
-
 # audit all open() syscalls on 64-bit systems
 my $key = key_gen();
-$result = system(
-    "auditctl -a always,exit -F arch=b$ENV{MODE} -S open -S openat -k $key");
-ok( $result, 0 );
+my $result_open = system(
+    "auditctl -a always,exit -F arch=b$ENV{MODE} -S open -k $key 2> $stderr");
+my $result_openat = system(
+    "auditctl -a always,exit -F arch=b$ENV{MODE} -S openat -k $key");
+
+ok($result_open == 0 or $result_openat == 0);
 
 # create a new file
 ( my $fh, my $filename ) =
   tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
 
 # test if we generate any audit records
-$result = system("ausearch -i -k $key > $stdout 2> $stderr");
+my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
 ok( $result, 0 );
 
 # test if we generate the SYSCALL record correctly
@@ -64,7 +65,7 @@ while ( $line = <$fh_out> ) {
 
     # test if we generate a SYSCALL record
     if ( $line =~ /^type=SYSCALL /
-        and ( $line =~ / syscall=open / or $line =~ / syscall=openat / ) )
+        and ( $line =~ / syscall=open(at)? / ) )
     {
         $found_syscall = 1;
     }

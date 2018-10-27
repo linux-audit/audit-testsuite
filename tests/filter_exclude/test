@@ -152,7 +152,7 @@ while ( $line = <$fh_out2> ) {
 
     # test if we generate a SYSCALL unlink record
     if ( $line =~ /^type=SYSCALL / ) {
-        if ( $line =~ / syscall=unlink / ) {
+        if ( $line =~ / syscall=unlink(at)? / ) {
             $found_msg = 1;
         }
     }
