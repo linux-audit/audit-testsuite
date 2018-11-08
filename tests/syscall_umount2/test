@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 4 }
+
+use File::Temp qw/ tempfile tempdir /;
+use POSIX ":sys_wait_h";
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout sink and tmp mount directory
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+my $tmpdir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
+
+###
+# tests
+
+# set the umount2 filter
+my $key = key_gen();
+my $result =
+  system("auditctl -A exit,always -F arch=b$ENV{MODE} -S umount2 -F key=$key >& /dev/null");
+ok( $result == 0 ); # audit umount2 filter added
+
+# start the client
+my $clientdir = "libfuse/example";
+my $client = "fusexmp";
+$result =
+  system("cd $basedir/$clientdir; echo \$\$ > $stdout; exec ./$client -f -s $tmpdir >/dev/null 2>&1 &");
+ok( $result == 0 ); # fuse client started
+my $pid_fuse = <$fh_out>;
+chomp($pid_fuse);
+$pid_fuse += 1;
+system("sleep 1");
+
+# suspend the client
+kill 'SIGSTOP', $pid_fuse;
+
+# run the test
+seek( $fh_out, 0, 0 );
+$result = system("echo \$\$ > $stdout; exec umount -l $tmpdir >/dev/null 2>&1 &");
+ok( $result == 0 ); # umount started
+my $pid_umnt = <$fh_out>;
+chomp($pid_umnt);
+$pid_umnt += 1;
+system("sleep 1");
+
+# test if the unmount is hung
+if (-e "/proc/$pid_umnt") {
+	$result = $pid_umnt;
+} else {
+	$result = -1;
+}
+ok( $result == -1 ); # umount finished
+
+###
+# cleanup
+kill 'SIGCONT', $pid_fuse;
+kill 'SIGTERM', $pid_umnt;
+kill 'SIGTERM', $pid_fuse;
+system("auditctl -D >& /dev/null");

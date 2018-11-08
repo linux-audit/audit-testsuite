@@ -18,6 +18,7 @@ TESTS := \
 	syscalls_file \
 	syscall_module \
 	syscall_socketcall \
+	syscall_umount2 \
 	user_msg
 
 .PHONY: all test clean
