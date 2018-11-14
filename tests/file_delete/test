@@ -100,7 +100,11 @@ while ( $line = <$fh_out> ) {
             and $line =~ / inode=$ino /
             and $line =~ / ouid=$uid_fmt /
             and $line =~ / ogid=$gid_fmt /
-            and $line =~ / (nametype|objtype)=DELETE / )
+            and $line =~ / (nametype|objtype)=DELETE /
+            and $line =~ / cap_fp=none /
+            and $line =~ / cap_fi=none /
+            and $line =~ / cap_fe=0 /
+            and $line =~ / cap_fver=0 / )
         {
             $found_delete = 1;
         }
