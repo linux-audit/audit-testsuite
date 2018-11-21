@@ -28,6 +28,13 @@ system("auditctl -D >& /dev/null");
     UNLINK   => 1
 );
 
+# store audit kernel config
+( my $fh_cfg, my $cfgout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-cfg-XXXX',
+    UNLINK   => 1
+);
+system("auditctl -s > $cfgout");
+
 my $result;
 my $i;
 for ( $i = 0 ; $i < 10 ; $i++ ) {    # iteration count of 10
@@ -108,4 +115,13 @@ if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
 
 ###
 # cleanup
+while ( $line = <$fh_cfg> ) {
+    my @fields = split /\s+/, $line;
+    if ( $fields[0] eq "backlog_limit" ) {
+        system("auditctl -b $fields[1] >/dev/null 2>&1");
+    }
+    if ( $fields[0] eq "backlog_wait_time" ) {
+        system("auditctl --backlog_wait_time $fields[1] >/dev/null 2>&1");
+    }
+}
 system("service auditd restart 2>/dev/null");
