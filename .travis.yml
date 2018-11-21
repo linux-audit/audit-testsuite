@@ -1,0 +1,16 @@
+language: minimal
+
+dist: xenial
+
+addons:
+  apt:
+    packages:
+      - astyle
+      - perltidy
+      - python-pip
+
+install:
+  - sudo pip install yapf
+
+script:
+  - tools/check-syntax -f && git diff --exit-code
