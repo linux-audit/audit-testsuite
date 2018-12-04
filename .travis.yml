@@ -1,4 +1,4 @@
-language: minimal
+language: c
 
 dist: xenial
 
@@ -8,9 +8,11 @@ addons:
       - astyle
       - perltidy
       - python-pip
+      - gcc-multilib
 
 install:
   - sudo pip install yapf
 
 script:
   - tools/check-syntax -f && git diff --exit-code
+  - make
