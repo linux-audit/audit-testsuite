@@ -2,8 +2,16 @@
 export CFLAGS+=-g -O0 -Wall -D_GNU_SOURCE
 
 DISTRO := $(shell ./os_detect)
-MODE := $(shell [ $(shell uname -i) == "i386" ] && echo "32" || echo "64")
+MACHINE := $(shell uname -m)
+# NOTE: this assumes that only i386 is 32-bit which is obviously wrong, but
+#       until we can test this on other 32-bit ABIs limit MODE=32 to i386
+ifeq ($(MACHINE),i386)
+MODE := 32
+else
+MODE := 64
+endif
 
+# all of the tests
 TESTS := \
 	exec_execve \
 	exec_name \
@@ -19,6 +27,11 @@ TESTS := \
 	syscall_module \
 	syscall_socketcall \
 	user_msg
+
+# apply any ABI restrictions to the tests
+ifneq ($(MACHINE),$(filter i386 x86_64,$(MACHINE)))
+	TESTS := $(filter-out syscall_socketcall,$(TESTS))
+endif
 
 .PHONY: all test clean
 
