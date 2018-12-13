@@ -65,7 +65,7 @@ for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
         my $lost = 0;
         seek( $fh_out, 0, 0 );
         system("auditctl -s >$stdout 2>/dev/null");
-	while ( $line = <$fh_out> ) {
+        while ( $line = <$fh_out> ) {
             if ( $line =~ /^lost ([0-9]+)/ ) {
                 $lost = $1;
                 last;
@@ -73,8 +73,9 @@ for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
         }
         if ( $lost > 0 ) {
             $counter = $timeout;
-            $i = $iterations;
-        } else {
+            $i       = $iterations;
+        }
+        else {
             sleep 0.1;
             $counter += 1;
         }
