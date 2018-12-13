@@ -37,7 +37,9 @@ system("auditctl -s > $cfgout");
 
 my $result;
 my $i;
-for ( $i = 0 ; $i < 50 ; $i++ ) {    # iteration count
+my $line;
+my $iterations = 50;
+for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
      # Kill the daemon, set the buffers low, set the wait time to 1ms, turn on auditing
     system("service auditd stop >/dev/null 2>&1");
     system("auditctl -D >/dev/null 2>&1");
@@ -56,7 +58,28 @@ for ( $i = 0 ; $i < 50 ; $i++ ) {    # iteration count
     # Add rule to generate audit queue events from floodping
     $result =
       system("auditctl -a exit,always -S all -F pid=$ping_pid >/dev/null 2>&1");
-    sleep 2;
+
+    my $counter = 0;
+    my $timeout = 50;
+    while ( $counter < $timeout ) {
+        my $lost = 0;
+        seek( $fh_out, 0, 0 );
+        system("auditctl -s >$stdout 2>/dev/null");
+	while ( $line = <$fh_out> ) {
+            if ( $line =~ /^lost ([0-9]+)/ ) {
+                $lost = $1;
+                last;
+            }
+        }
+        if ( $lost > 0 ) {
+            $counter = $timeout;
+            $i = $iterations;
+        } else {
+            sleep 0.1;
+            $counter += 1;
+        }
+    }
+
     kill 'TERM', $ping_pid;
     system("auditctl -d exit,always -S all -F pid=$ping_pid >/dev/null 2>&1");
 
@@ -93,7 +116,6 @@ $result = system(
 ok( $result, 0 );       # Was an event found?
 
 # test if we generate the lost reset record correctly
-my $line;
 my $found_msg = 0;
 my $reset_msg = 0;
 while ( $line = <$fh_out> ) {
