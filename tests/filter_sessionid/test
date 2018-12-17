@@ -54,7 +54,7 @@ chomp($sessionid);
 # create a key and rule
 my $key = key_gen();
 $result = system(
-"auditctl -a always,exit -F arch=b64 -F path=/tmp/$key -F sessionid=$sessionid -k $key"
+"auditctl -a always,exit -F arch=b$ENV{MODE} -F path=/tmp/$key -F sessionid=$sessionid -k $key"
 );
 ok( $result, 0 );
 

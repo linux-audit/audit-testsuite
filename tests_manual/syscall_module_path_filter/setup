@@ -1,6 +1,6 @@
 #!/bin/sh
 
-echo "-a always,exit -F arch=b64 -S init_module -S finit_module -k ghak8-mod-load" > /etc/audit/rules.d/tests_manual-syscall_module_path_filter.rules
+echo "-a always,exit -F arch=$(uname -i) -S init_module -S finit_module -k ghak8-mod-load" > /etc/audit/rules.d/tests_manual-syscall_module_path_filter.rules
 echo "-a never,filesystem -F fstype=0x74726163 -F key=ghak8-mod_load-ignore_tracefs" >> /etc/audit/rules.d/tests_manual-syscall_module_path_filter.rules
 echo "-a never,filesystem -F fstype=0x64626720 -F key=ghak8-mod_load-ignore_debugfs" >> /etc/audit/rules.d/tests_manual-syscall_module_path_filter.rules
 
