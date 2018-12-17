@@ -45,9 +45,11 @@ my $result;
 
 # connect
 system(
-"auditctl -a always,exit -F arch=b64 -S init_module -S finit_module -k $key-load"
+"auditctl -a always,exit -F arch=b$ENV{MODE} -S init_module -S finit_module -k $key-load"
 );
-system("auditctl -a always,exit -F arch=b64 -S delete_module -k $key-unload");
+system(
+"auditctl -a always,exit -F arch=b$ENV{MODE} -S delete_module -k $key-unload"
+);
 
 # run the test
 my $name = "arp_tables";

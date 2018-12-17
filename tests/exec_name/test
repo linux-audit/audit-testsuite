@@ -59,7 +59,8 @@ sub do_test {
     # set the audit-by-executable filter
     my $key = key_gen();
     system(
-        "auditctl -a always,exit -F $rule -F arch=b64 -S exit_group -k $key");
+"auditctl -a always,exit -F $rule -F arch=b$ENV{MODE} -S exit_group -k $key"
+    );
 
     # run the watched executable
     system("$exec > /dev/null 2> /dev/null");
