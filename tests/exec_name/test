@@ -67,43 +67,43 @@ sub do_test {
     my @expected = (0) x scalar @execs;
     my $key      = key_gen();
     foreach ( @{$exit} ) {
-￼       my $op  = %$_{op};
-￼       my $exe = %$_{exe};
-￼       if ( $op eq "=" ) {
-￼           $expected[$exe] = 1;
-￼       }
-￼       else {
-￼           for ( 0 .. $#execs ) {
-￼               $expected[$_] = 1 if $_ != $exe;
-￼           }
-￼       }
-￼       system( "auditctl -a always,exit -F exe$op$execs[$exe] "
-￼              . "-F arch=b$ENV{MODE} -S exit_group -k $key" );
-￼   }
+        my $op  = %$_{op};
+        my $exe = %$_{exe};
+        if ( $op eq "=" ) {
+            $expected[$exe] = 1;
+        }
+        else {
+            for ( 0 .. $#execs ) {
+                $expected[$_] = 1 if $_ != $exe;
+            }
+        }
+        system( "auditctl -a always,exit -F exe$op$execs[$exe] "
+              . "-F arch=b$ENV{MODE} -S exit_group -k $key" );
+    }
 
     # add a universal rule if no exit filters given
-￼   if ( scalar @{$exit} == 0 ) {
-￼       @expected = (1) x scalar @execs;
-￼       system("auditctl -a always,exit -F arch=b$ENV{MODE} -S exit_group "
-               . "-k $key");
-￼   }
+    if ( scalar @{$exit} == 0 ) {
+        @expected = (1) x scalar @execs;
+        system( "auditctl -a always,exit -F arch=b$ENV{MODE} -S exit_group "
+              . "-k $key" );
+    }
 
     foreach ( @{$exclude} ) {
         my $op  = %$_{op};
-￼       my $exe = %$_{exe};
-￼       if ( $op eq "=" ) {
-￼           $expected[$exe] = 0;
-￼       }
-￼       else {
-￼           for ( 0 .. $#execs ) {
-￼               $expected[$_] = 0 if $_ != $exe;
-￼           }
-￼       }
-￼       system("auditctl -a always,exclude -F exe$op$execs[$exe]");
-￼   }
-￼
-￼   # run the executables
-￼   system("$_ > /dev/null 2> /dev/null") for (@execs);
+        my $exe = %$_{exe};
+        if ( $op eq "=" ) {
+            $expected[$exe] = 0;
+        }
+        else {
+            for ( 0 .. $#execs ) {
+                $expected[$_] = 0 if $_ != $exe;
+            }
+        }
+        system("auditctl -a always,exclude -F exe$op$execs[$exe]");
+    }
+
+    # run the executables
+    system("$_ > /dev/null 2> /dev/null") for (@execs);
 
     # test if we generate any audit records from the filter rule
     my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
@@ -111,7 +111,7 @@ sub do_test {
 
     # test if we generate the SYSCALL records correctly
     my $line;
-    my @found = (0) x scalar @execs;
+    my @found       = (0) x scalar @execs;
     my $found_exec  = 0;
     my $found_exec2 = 0;
     seek( $fh_out, 0, 0 );
