@@ -1,0 +1,420 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Temp qw/ tempdir tempfile /;
+use Test;
+use IO::Handle;
+BEGIN { plan tests => 34 }
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+sub mark_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
+# reset audit rules
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_tmp, my $tmpout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-tmp-XXXX',
+    UNLINK   => 1
+);
+my $tmpdir = tempdir(
+    TEMPLATE => '/tmp/audit-testsuite-dir-XXXX',
+    CLEANUP  => 1
+);
+
+my $key = key_gen();
+my $result;
+
+my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
+  localtime(time);
+$year += 1900;
+$mon  += 1;
+my $startdate = "$year-$mon-$mday";
+my $starttime = "$hour:$min:$sec";
+
+my $contidself   = int( rand( 1 << 63 ) );
+my $contid1      = int( rand( 1 << 63 ) );
+my $contid_unset = 18446744073709551615;
+my $contid1a     = int( rand( 1 << 63 ) );
+my $contid2      = int( rand( 1 << 63 ) );
+my $contidfilt   = int( rand( 1 << 63 ) );
+my $contid1net   = int( rand( 1 << 63 ) );
+my $contid2net   = int( rand( 1 << 63 ) );
+
+###
+# tests
+################################################################################
+# Test self-set
+seek( $fh_out, 0, 0 );
+
+# Set the audit container identifier and save the pid responsible
+my $resultself;
+my $self_pid = fork();
+if ( not $self_pid ) {
+    open( my $contidfd, '>', "/proc/self/audit_containerid" );
+    $contidfd->autoflush(1);
+    $resultself = print $contidfd $contidself;
+    if ( not $resultself ) {
+        $resultself = $!;
+    }
+    close($contidfd);
+    exit $resultself;
+}
+wait();
+$resultself = $? >> 8;
+ok( $self_pid > 0 );       # Did taskself start ok?
+ok( $resultself != 1 );    # Did self-set fail?
+
+# Start sleep to provide target task
+my $task1_pid = fork();
+if ( not $task1_pid ) {
+    sleep 2;
+    exit;
+}
+sleep .01;
+ok( $task1_pid > 0 );      # Did task1 start ok?
+
+################################################################################
+# Test set
+open( my $contidfd, '>', "/proc/$task1_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd "$contid1\n";
+close($contidfd);
+ok($result);               # Did set succeed?
+
+################################################################################
+# Test set same
+open( $contidfd, '>', "/proc/$task1_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd "$contid1\n";
+close($contidfd);
+ok( not $result );         # Did set same fail?
+
+################################################################################
+# Test unset
+open( $contidfd, '>', "/proc/$task1_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd $contid_unset;
+close($contidfd);
+ok( not $result );         # Did unset fail?
+
+################################################################################
+# Test set again by same orch
+open( $contidfd, '>', "/proc/$task1_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd $contid1a;
+close($contidfd);
+ok( not $result );         # Did set again fail?
+
+################################################################################
+# Test task injection to existing container
+# Start sleep to provide injection target task
+my $task1a_pid = fork();
+if ( not $task1a_pid ) {
+    sleep 2;
+    exit;
+}
+sleep .01;
+ok( $task1a_pid > 0 );    # Did task1a start ok?
+
+# Test task injection
+open( $contidfd, '>', "/proc/$task1a_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd "$contid1\n";
+close($contidfd);
+ok($result);              # Did injection succeed?
+
+################################################################################
+# Test child with child fail
+my $task2_pid = fork();
+if ( not $task2_pid ) {
+    my $task2child_pid = fork();
+    if ( not $task2child_pid ) {
+        sleep 2;
+        exit;
+    }
+    wait();
+    exit;
+}
+sleep 1;
+open( $contidfd, '>', "/proc/$task2_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd $contid2;
+close($contidfd);
+ok( not $result );       # Did set child with child fail?
+ok( $task2_pid > 0 );    # Did task2 start ok?
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m sync-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER 2> /dev/null | grep -q sync-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# find the op events
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+$result = system(
+"LC_TIME=\"en_DK.utf8\" ausearch -ts $startdate $starttime -m CONTAINER_OP >$stdout 2>$stderr"
+);
+ok( $result, 0 );    # Was an event found?
+
+# test if we generate the op record correctly
+my $line;
+my $contidself_found   = 0;
+my $contid1_found      = 0;
+my $contid_unset_found = 0;
+my $contid1a_found     = 0;
+my $contid1i_found     = 0;
+my $contid2_found      = 0;
+
+while ( $line = <$fh_out> ) {
+
+    if ( $line =~ /^type=CONTAINER_OP / ) {
+        if ( $line =~ / opid=([0-9]+) contid=([0-9]+) / ) {
+            if ( $1 == $self_pid && $2 == $contidself ) {
+                $contidself_found = 1;
+            }
+            elsif ( $1 == $task1_pid && $2 == $contid1 ) {
+                $contid1_found = 1;
+            }
+            elsif ( $1 == $task1_pid && $2 == $contid_unset ) {
+                $contid_unset_found = 1;
+            }
+            elsif ( $1 == $task1_pid && $2 == $contid1a ) {
+                $contid1a_found = 1;
+            }
+            elsif ( $1 == $task1a_pid && $2 == $contid1 ) {
+                $contid1i_found = 1;
+            }
+            elsif ( $1 == $task2_pid && $2 == $contid2 ) {
+                $contid2_found = 1;
+            }
+        }
+    }
+}
+ok( $contidself_found,   1 );    # Was the contidself message well-formed?
+ok( $contid1_found,      1 );    # Was the contid1 message well-formed?
+ok( $contid_unset_found, 1 );    # Was the contid_unset message well-formed?
+ok( $contid1a_found,     1 );    # Was the contid1a message well-formed?
+ok( $contid1i_found,     1 );    # Was the contid1i message well-formed?
+ok( $contid2_found,      1 );    # Was the contid2 message well-formed?
+
+# Test filter on containerid
+$result = system(
+"auditctl -a exit,always -F arch=b$abi_bits -F dir=$tmpdir -F perm=wa -F contid=$contidfilt -F key=$key >/dev/null 2>&1"
+);
+ok( $result, 0 );                # Filter rule added successfully?
+my $taskfilt_pid = fork();
+if ( not $taskfilt_pid ) {
+    sleep 1;
+    open( $contidfd, '>', "$tmpdir/$key" );
+    $contidfd->autoflush(1);
+    print $contidfd $contidfilt;
+    close($contidfd);
+    exit;
+}
+sleep .01;
+open( $contidfd, '>', "/proc/$taskfilt_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd $contidfilt;
+close($contidfd);
+ok($result);                # Was the filter trigger successfully run?
+ok( $taskfilt_pid > 0 );    # Did taskfilt start ok?
+sleep 1;
+system(
+"auditctl -d exit,always -F arch=b$abi_bits -F dir=$tmpdir -F perm=wa -F contid=$contidfilt -F key=$key >/dev/null 2>&1"
+);
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m sync2-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER 2> /dev/null | grep -q sync2-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# find the event
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+$result =
+  system("ausearch -ts recent -i -m CONTAINER_ID -k $key >$stdout 2>$stderr");
+ok( $result, 0 );    # Was an event found?
+my $contidfilt_found = 0;
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=CONTAINER_ID / ) {
+        if ( $line =~ / contid=([0-9]+)/ ) {
+            if ( $1 == $contidfilt ) {
+                $contidfilt_found = 1;
+            }
+        }
+    }
+}
+ok( $contidfilt_found, 1 );    # Was the contidfilt message well-formed?
+
+################################################################################
+# Test multiple containers on one netns
+# Create two child processes
+my $task1net_pid = fork();
+if ( not $task1net_pid ) {
+    sleep 2;
+    exit;
+}
+ok( $task1net_pid > 0 );       # Did task1net start ok?
+sleep .01;
+open( $contidfd, '>', "/proc/$task1net_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd $contid1net;
+close($contidfd);
+ok($result);                   # Was contid1net written to task1net?
+
+my $task2net_pid = fork();
+if ( not $task2net_pid ) {
+    sleep 2;
+    exit;
+}
+ok( $task2net_pid > 0 );       # Did task2net start ok?
+sleep .01;
+open( $contidfd, '>', "/proc/$task2net_pid/audit_containerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd $contid2net;
+close($contidfd);
+ok($result);                   # Was contid2net written to task2net?
+
+# Set up audit rules in netfilter and send a test packet
+my $mark = int( rand(99999999) );
+$result = system(
+"iptables -I INPUT -i lo -p icmp --icmp-type echo-request -j AUDIT --type accept >/dev/null 2>&1"
+);
+ok( $result, 0 );              # Was the iptables filter rule added successful
+$result = system(
+"iptables -I INPUT  -t mangle -i lo -p icmp --icmp-type echo-request -j MARK --set-mark 0x$mark >/dev/null 2>&1"
+);
+ok( $result, 0 );              # Was the iptables mangle rule added successful
+sleep 1;
+$result = system("ping -q -c 1 127.0.0.1 >/dev/null 2>&1");
+ok( $result, 0 );              # Was ping successful?
+sleep 1;
+system(
+"iptables -D INPUT -i lo -p icmp --icmp-type echo-request -j AUDIT --type accept >/dev/null 2>&1"
+);
+system(
+"iptables -D INPUT  -t mangle -i lo -p icmp --icmp-type echo-request -j MARK --set-mark 0x$mark >/dev/null 2>&1"
+);
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m sync3-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER 2> /dev/null | grep -q sync3-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# find the event
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+$result = system(
+"LC_TIME=\"en_DK.utf8\" ausearch -ts $startdate $starttime -i -m NETFILTER_PKT >$stdout 2>$stderr"
+);
+ok( $result, 0 );    # Was an event found?
+my $contid1net_found = 0;
+my $contid2net_found = 0;
+my $id            = "";
+
+while ( $line = <$fh_out> ) {
+
+    if ( $line =~ /^type=NETFILTER_PKT / ) {
+        if ( $line =~ / mark=0x$mark / ) {
+            ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+        }
+    }
+}
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+$result = system("ausearch -ts boot -a $id >$stdout 2>$stderr");
+ok( $result, 0 );    # Was an event found?
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=CONTAINER_ID / ) {
+        if ( $line =~ / contid=([,0-9]+)/ ) {
+            my $contids = $1;
+            if ( $contids =~ /$contid1net/ ) {
+                $contid1net_found = 1;
+            }
+            if ( $contids =~ /$contid2net/ ) {
+                $contid2net_found = 1;
+            }
+        }
+    }
+}
+ok( $contid1net_found, 1 );    # Was the contid1net message well-formed?
+ok( $contid2net_found, 1 );    # Was the contid2net message well-formed?
+
+################################################################################
+# Debug
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    print "\ndebug: start\n";
+    if ( !$contidself_found || !$resultself ) {
+        print
+          "self_pid=$self_pid contidself=$contidself resultself=$resultself\n";
+    }
+    if ( !$contid1_found ) {
+        print "task1_pid=$task1_pid contid1=$contid1\n";
+    }
+    if ( !$contid_unset_found ) {
+        print "task1_pid=$task1_pid contid_unset=$contid_unset\n";
+    }
+    if ( !$contid1a_found ) {
+        print "task1_pid=$task1_pid contid1a=$contid1a\n";
+    }
+    if ( !$contid1i_found ) {
+        print "task1a_pid=$task1a_pid contid1i=$contid1\n";
+    }
+    if ( !$contid2_found ) {
+        print "task2_pid=$task2_pid contid2=$contid2\n";
+    }
+    if ( !$contidfilt_found ) {
+        print "taskfilt_pid=$taskfilt_pid contidfilt=$contidfilt dir=$tmpdir key=$key\n";
+    }
+    if ( !$contid1net_found ) {
+        print "mark=$mark id=$id contid1net=$contid1net\n";
+    }
+    if ( !$contid2net_found ) {
+        print "mark=$mark id=$id contid2net=$contid2net\n";
+    }
+    print "debug: end\n\n\n";
+}
+
+###
+# cleanup
+system("service auditd restart 2>/dev/null");
