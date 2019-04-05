@@ -25,6 +25,7 @@ TESTS := \
 	login_tty \
 	lost_reset \
 	netfilter_pkt \
+	signal \
 	syscalls_file \
 	syscall_module \
 	syscall_socketcall \
