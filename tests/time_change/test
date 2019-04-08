@@ -1,0 +1,250 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 84 }
+
+use File::Temp qw/ tempfile /;
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+# we need to filter by sessionid to avoid possible interaction with NTP daemon
+my $sid = qx( cat /proc/self/sessionid );
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+sub filter_setup {
+    my ( $syscall, $key ) = @_;
+    system(
+"auditctl -a always,exit -F sessionid=$sid -F arch=b$ENV{MODE} -S $syscall -k $key"
+    );
+}
+
+sub filter_cleanup {
+    system("auditctl -D >& /dev/null");
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+sub test_settime {
+    my ( $mode, $syscall ) = @_;
+
+    my $key = key_gen();
+    my $result;
+
+    # set the filter
+    filter_setup( $syscall, $key );
+
+    # run the test
+    $result = system("$basedir/test_settime $mode 757094400 123456");
+    ok( $result, 0 );
+
+    # make sure the records had a chance to bubble through to the logs
+    system("auditctl -m syncmarker-$key");
+    for ( my $i = 0 ; $i < 10 ; $i++ ) {
+        if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+            last;
+        }
+        sleep(0.2);
+    }
+
+    # test if we generate the TIME_INJOFFSET aux record
+    $result =
+      system("ausearch -i -k $key -m TIME_INJOFFSET > $stdout 2> $stderr");
+    ok( $result, 0 );
+
+    my $line;
+    my $id              = "";
+    my $found_injoffset = 0;
+    seek( $fh_out, 0, 0 );
+    while ( $line = <$fh_out> ) {
+        if ( $line =~ /^type=TIME_INJOFFSET / ) {
+            if ( $line =~ / sec=-[0-9]+ nsec=-?[0-9]+/ ) {
+                $found_injoffset = 1;
+                ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            }
+        }
+    }
+
+    ok($found_injoffset);
+
+    # test if we can find the associated SYSCALL record
+    $result = system("ausearch -i -m SYSCALL -k $key -a $id >/dev/null 2>&1");
+    ok( $result, 0 );
+
+    # cleanup
+    filter_cleanup();
+}
+
+test_settime( "settimeofday", "settimeofday" );
+test_settime( "posix",        "clock_settime" );
+
+sub test_adjtime_setoffset {
+    my ( $mode, $syscall, $sec, $usec ) = @_;
+
+    my $key = key_gen();
+    my $result;
+
+    # set the filter
+    filter_setup( $syscall, $key );
+
+    # run the test
+    $result = system("$basedir/test_adjtime $mode setoffset $sec $usec");
+    ok( $result, 0 );
+
+    # make sure the records had a chance to bubble through to the logs
+    system("auditctl -m syncmarker-$key");
+    for ( my $i = 0 ; $i < 10 ; $i++ ) {
+        if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+            last;
+        }
+        sleep(0.2);
+    }
+
+    # test if we generate the correct TIME_INJOFFSET aux record
+    system("ausearch -i -k $key -m TIME_INJOFFSET > $stdout 2> $stderr");
+    ok( $result, 0 );
+
+    my $line;
+    my $id                  = "";
+    my $found_injoffset     = 0;
+    my $found_injoffset_any = 0;
+    seek( $fh_out, 0, 0 );
+    while ( $line = <$fh_out> ) {
+        if ( $line =~ /^type=TIME_INJOFFSET / ) {
+            $found_injoffset_any = 1;
+            if ( $line =~ / sec=$sec nsec=$usec/ ) {
+                $found_injoffset = 1;
+                ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            }
+        }
+    }
+
+    if ( $sec eq 0 and $usec eq 0 ) {
+
+        # no TIME_INJOFFSET records should be found
+        ok( not $found_injoffset_any );
+
+        # test if we can find the SYSCALL record
+        $result = system("ausearch -i -m SYSCALL -k $key >/dev/null 2>&1");
+        ok( $result, 0 );
+    }
+    else {
+        ok($found_injoffset);
+
+        # test if we can find the associated SYSCALL record
+        $result =
+          system("ausearch -i -m SYSCALL -k $key -a $id >/dev/null 2>&1");
+        ok( $result, 0 );
+    }
+
+    # cleanup
+    filter_cleanup();
+}
+
+test_adjtime_setoffset( "adjtimex", "adjtimex",      42,  123456 );
+test_adjtime_setoffset( "posix",    "clock_adjtime", -10, 123456 );
+
+test_adjtime_setoffset( "adjtimex", "adjtimex",      0, 0 );
+test_adjtime_setoffset( "posix",    "clock_adjtime", 0, 0 );
+
+sub test_adjtime_ntpval {
+    my ( $mode, $syscall, $op, $val1, $val1exp, $val2, $val2exp ) = @_;
+
+    my $key = key_gen();
+    my $result;
+
+    # set the filter
+    filter_setup( $syscall, $key );
+
+    # run the test
+    $result = system("$basedir/test_adjtime $mode $op $val1 $val2");
+    ok( $result, 0 );
+
+    # make sure the records had a chance to bubble through to the logs
+    system("auditctl -m syncmarker-$key");
+    for ( my $i = 0 ; $i < 10 ; $i++ ) {
+        if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+            last;
+        }
+        sleep(0.2);
+    }
+
+    # test if we generate the correct TIME_ADJNTPVAL aux record
+    system("ausearch -i -k $key -m TIME_ADJNTPVAL > $stdout 2> $stderr");
+    ok( $result, 0 );
+
+    my $line;
+    my $id                  = "";
+    my $found_adjntpval     = 0;
+    my $found_adjntpval_tot = 0;
+    seek( $fh_out, 0, 0 );
+    while ( $line = <$fh_out> ) {
+        if ( $line =~ /^type=TIME_ADJNTPVAL .*: op=$op / ) {
+            $found_adjntpval_tot += 1;
+            if (   $line =~ / old=-?[0-9]+ new=$val1exp/
+                or $line =~ / old=$val1exp new=$val2exp/ )
+            {
+                $found_adjntpval = 1;
+                ($id) = ( $line =~ / msg=audit\(.*:([0-9]*)\).* / );
+            }
+        }
+    }
+
+    # there should be exactly 2 records found (set & reset); no more, no less
+    ok( $found_adjntpval_tot, 2 );
+
+    # plus, one of those (set) should have the right values of old/new
+    ok($found_adjntpval);
+
+    # test if we can find the associated SYSCALL record
+    $result = system("ausearch -i -m SYSCALL -k $key -a $id >/dev/null 2>&1");
+    ok( $result, 0 );
+
+    # cleanup
+    filter_cleanup();
+}
+
+sub test_adjtime_ntpval_all {
+    my ( $op, $val1, $val1exp, $val2, $val2exp ) = @_;
+
+    test_adjtime_ntpval( "adjtimex", "adjtimex", $op, $val1, $val1exp, $val2,
+        $val2exp );
+    test_adjtime_ntpval( "posix", "clock_adjtime", $op, $val1, $val1exp, $val2,
+        $val2exp );
+}
+
+my $FC = ( 1000 << 16 );
+test_adjtime_ntpval_all( "adjust", 42,  42,         -42,  -42 );
+test_adjtime_ntpval_all( "offset", 100, "-?[0-9]+", 200,  "-?[0-9]+" );
+test_adjtime_ntpval_all( "freq",   42,  42 * $FC,   -42,  -42 * $FC );
+test_adjtime_ntpval_all( "status", 0,   "[0-9]+",   0,    "[0-9]+" );
+test_adjtime_ntpval_all( "tai",    42,  42,         1234, 1234 );
+test_adjtime_ntpval_all( "tick",   0,   "-?[0-9]+", 0,    "-?[0-9]+" );
