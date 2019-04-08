@@ -27,6 +27,7 @@ TESTS := \
 	syscalls_file \
 	syscall_module \
 	syscall_socketcall \
+	time_change \
 	user_msg \
 	fanotify \
 	bpf
