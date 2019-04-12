@@ -62,6 +62,15 @@ system("$basedir/execve_arg_gen count $test_count");
 system("$basedir/execve_arg_gen size $test_size");
 system("$basedir/execve_arg_gen hex $test_hex");
 
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
 # test if we generate any audit records from the filter rule
 my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
 ok( $result, 0 );

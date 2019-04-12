@@ -68,6 +68,15 @@ system("auditctl -w $dir -k $key");
 # delete file
 unlink($filename);
 
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
 # test if we generate any audit records from the watch
 my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
 ok( $result, 0 );

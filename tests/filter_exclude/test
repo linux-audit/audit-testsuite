@@ -119,6 +119,15 @@ ok( $result, 0 );
 open( my $tmpfile, ">", "/tmp/$key" );
 close($tmpfile);
 
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
 # test for the SYSCALL message provoked by creat
 $result = system(
 "ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj_user:$subj_role:$subj_type:$subj_sen-$subj_clr -ts recent > $stdout 2> /dev/null"
@@ -139,7 +148,14 @@ ok( $result, 0 );
 
 unlink "/tmp/$key";
 
-system("sync");
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
 
 # test for the SYSCALL message provoked by unlink
 $result = system(

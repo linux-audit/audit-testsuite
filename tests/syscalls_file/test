@@ -52,6 +52,15 @@ ok( $result_open == 0 or $result_openat == 0 );
 ( my $fh, my $filename ) =
   tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
 
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
 # test if we generate any audit records
 my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
 ok( $result, 0 );

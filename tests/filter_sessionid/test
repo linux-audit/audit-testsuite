@@ -63,6 +63,15 @@ system("echo \$\$ > $pidout; exec touch /tmp/$key");
 my $pid = <$fh_pid>;
 chomp($pid);
 
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
 # test for the SYSCALL message
 $result = system(
 "ausearch -i -m SYSCALL -sc open -p $pid --session $sessionid -k $key > $stdout 2> $stderr"

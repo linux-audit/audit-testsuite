@@ -8,11 +8,15 @@ BEGIN { plan tests => 1 + 6 * 2 }
 
 use File::Temp qw/ tempfile /;
 
-my $basedir = $0;
-$basedir =~ s|(.*)/[^/]*|$1|;
-
 ###
 # functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
 
 ###
 # setup
@@ -97,14 +101,21 @@ for ( 0 .. $#tests ) {
           . " -j MARK --set-mark 0x"
           . $mark[$_] );
 }
-sleep 1;
 
 # run the tests
 for ( 0 .. $#tests ) {
     system( $trig[$_] );
 }
 
-system("sleep 1; sync");
+# make sure the records had a chance to bubble through to the logs
+my $key = key_gen();
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
 
 # test if we generate any audit records from the filter rules
 my $result =
