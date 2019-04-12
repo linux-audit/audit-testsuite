@@ -7,9 +7,6 @@ BEGIN { plan tests => 6 }
 
 use File::Temp qw/ tempfile /;
 
-my $basedir = $0;
-$basedir =~ s|(.*)/[^/]*|$1|;
-
 ###
 # functions
 
@@ -55,7 +52,15 @@ system(
 my $name = "arp_tables";
 $result = system("modprobe $name >/dev/null 2>&1");
 ok( $result, 0 );    # Did the modprobe succeed?
-system("sleep 1;sync");
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
 
 # test if we generate any audit records from the filter rule
 $result = system("ausearch -k $key-load > $stdout 2> $stderr");
@@ -76,7 +81,16 @@ ok($found_name);    # Was the load module found?
 
 $result = system("rmmod $name");
 ok( $result, 0 );    # Did the rmmod succeed?
-system("sleep 1;sync");
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
 seek( $fh_out, 0, 0 );
 seek( $fh_err, 0, 0 );
 $found_name = 0;

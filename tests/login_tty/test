@@ -10,6 +10,13 @@ use File::Temp qw/ tempdir tempfile /;
 ###
 # functions
 
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
 ###
 # setup
 
@@ -54,6 +61,16 @@ system("echo \$\$ > $tmpout; exec echo \$(id -u) > /proc/self/loginuid");
 # try to grab PID from the environment (NOTE: requires bash)
 my $pid = <$fh_tmp>;
 chomp($pid);
+
+# make sure the records had a chance to bubble through to the logs
+my $key = key_gen();
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
 
 # test for the LOGIN message
 my $result =

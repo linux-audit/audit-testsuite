@@ -8,6 +8,13 @@ BEGIN { plan tests => 5 }
 ###
 # functions
 
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
 ###
 # setup
 
@@ -110,7 +117,15 @@ ok( $result, 0 );    # Was the reset command successful?
 my $reset_rc = $1;
 ok( $reset_rc > 0 );    # Was the lost value non-zero?
 
-sleep 1;
+# make sure the records had a chance to bubble through to the logs
+my $key = key_gen();
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
 
 # find the config change event
 seek( $fh_out, 0, 0 );
@@ -118,7 +133,7 @@ seek( $fh_err, 0, 0 );
 $result = system(
 "LC_TIME=\"en_DK.utf8\" ausearch --start $startdate $starttime -i -m CONFIG_CHANGE >$stdout 2>$stderr"
 );
-ok( $result, 0 );       # Was an event found?
+ok( $result, 0 );    # Was an event found?
 
 # test if we generate the lost reset record correctly
 my $found_msg = 0;

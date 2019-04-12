@@ -58,7 +58,14 @@ my $portno = 42424;
 # run the test
 system("echo Hello World. | $basedir/conn 127.0.0.1 $portno >/dev/null 2>&1");
 
-system("sleep 1;sync");
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
 
 # test if we generate any audit records from the filter rule
 my $result = system("ausearch -i -k $key > $stdout 2> $stderr");

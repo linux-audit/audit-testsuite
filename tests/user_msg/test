@@ -46,8 +46,15 @@ system("echo \$BASHPID\ > $tmpout; exec auditctl -m \"Testing 1 2 3 $key\"");
 my $pid = <$fh_tmp>;
 chomp($pid);
 
-# test for the userspace message
-my $result = system("ausearch -m USER -p $pid > $stdout 2> $stderr");
+# test for the userspace message (it may take some time to appear in logs)
+my $result;
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    $result = system("ausearch -m USER -p $pid > $stdout 2> $stderr");
+    if ( $result eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
 ok( $result, 0 );
 
 # test if we generate the USER record correctly
