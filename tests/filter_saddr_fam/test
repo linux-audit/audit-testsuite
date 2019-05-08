@@ -1,0 +1,140 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Temp qw/ tempdir tempfile /;
+use Test;
+BEGIN { plan tests => 5 }
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >/dev/null 2>&1");
+
+# limit ausearch to this test's events
+my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
+  localtime(time);
+$year += 1900;
+$mon  += 1;
+my $startdate = "$year-$mon-$mday";
+my $starttime = "$hour:$min:$sec";
+
+# create temp directory
+my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+# set test rule key
+my $key = key_gen();
+
+my $result;
+my $rule;
+
+# set bad test rule
+$rule   = "always,exit -F arch=b$ENV{MODE} -S all -F saddr_fam=100 -F key=$key";
+$result = system("auditctl -a $rule >/dev/null 2>&1");
+ok( $result ne 0 );
+
+# set test rule
+$rule   = "always,exit -F arch=b$ENV{MODE} -S all -F saddr_fam=2 -F key=$key";
+$result = system("auditctl -a $rule >/dev/null 2>&1");
+ok( $result, 0 );
+
+# issue command to generate non-inet SOCKADDR traffic
+system("auditctl -s >/dev/null 2>&1");
+
+# issue test command to generate inet SOCKADDR record event
+my $port = 24242;
+system("exec 3<>/dev/udp/127.0.0.1/$port >/dev/null 2>&1;echo hi >&3");
+
+# delete test rule
+system("auditctl -d $rule >/dev/null 2>&1");
+
+# create marker event and wait for it to ensure our events are in the log
+system("auditctl -m syncmarker-$key >/dev/null 2>&1");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# find the event
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+$result = system(
+"LC_TIME=\"en_DK.utf8\" ausearch --start $startdate $starttime -i -m sockaddr -k $key >$stdout 2>$stderr"
+);
+ok( $result, 0 );    # Was an event found?
+
+# find the message ids of the records for that key
+my $line;
+my $id        = "";
+my $found_msg = 0;
+my %ids;
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=/ ) {
+        ($id) = ( $line =~ / msg=audit\(.+:([0-9]+)\).* / );
+        if ( !( exists $ids{$id} ) ) {
+            $ids{$id} = 0;
+        }
+        if ( $line =~ /^type=CONFIG_CHANGE / ) {
+            $ids{$id} = 1;
+        }
+    }
+}
+
+# verify all records are only inet (filter out rule commands)
+my $found_unfilt = "";
+foreach $id ( sort( keys %ids ) ) {
+    if ( $ids{$id} eq 0 ) {
+        seek( $fh_out, 0, 0 );
+        seek( $fh_err, 0, 0 );
+        system(
+"LC_TIME=\"en_DK.utf8\" ausearch --start $startdate $starttime -i -a $id > $stdout 2> $stderr"
+        );
+        while ( $line = <$fh_out> ) {
+            if ( $line =~ /^type=SOCKADDR / ) {    # find the sockaddr record
+                $line =~ / saddr_fam=([a-z]+) /;
+                if ( $1 eq "inet" ) {
+                    $found_msg = 1;
+                }
+                else {
+                    $found_unfilt = $1;
+                }
+            }
+        }
+    }
+}
+ok( $found_msg,    1 );     # Was the inet message found?
+ok( $found_unfilt, "" );    # Were non-inet messages filtered?
+
+# print any debug info if the test fails
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    if ($found_unfilt) {
+        print "found_unfilt=$found_unfilt\n";
+    }
+}
+
+###
+# cleanup
+system("auditctl -D >/dev/null 2>&1");
+system("service auditd restart 2>/dev/null");

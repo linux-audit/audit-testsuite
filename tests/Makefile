@@ -19,6 +19,7 @@ TESTS := \
 	file_delete \
 	file_rename \
 	filter_exclude \
+	filter_saddr_fam \
 	filter_sessionid \
 	login_tty \
 	lost_reset \
