@@ -81,7 +81,7 @@ my $found_sockaddr   = 0;
 while ( $line = <$fh_out> ) {
     if ( $line =~ /^type=SOCKADDR / ) {
         if ( $line =~
-/ : saddr=(\{ fam=|)inet (laddr=|host:)127.0.0.1 (lport=|serv:)$portno( \}|)/
+/ : saddr=(\{ fam=|\{ saddr_fam=|)inet (laddr=|host:)127.0.0.1 (lport=|serv:)$portno( \}|)/
           )
         {
             $found_sockaddr = 1;
