@@ -52,11 +52,22 @@ please follow the instructions below.
 
 ### Debian Based Systems
 
+On Debian you need to install a number of dependencies as well as perform some
+additional system configuration.  Install the dependencies using the commands
+below:
+
 	# apt-get install auditd \
 	                  build-essential \
 	                  libc6-i386 \
+	                  libc6-dev-i386 \
 	                  perl-modules \
 	                  netcat
+
+After the dependencies are installed you should ensure that BASH is installed
+on the system and that /bin/sh points to BASH, not Dash:
+
+	# apt-get install bash
+	# dpkg-reconfigure dash
 
 ## Execution
 
