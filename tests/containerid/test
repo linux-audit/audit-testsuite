@@ -4,7 +4,9 @@ use strict;
 use File::Temp qw/ tempdir tempfile /;
 use Test;
 use IO::Handle;
-BEGIN { plan tests => 34 }
+use Sys::Syscall;    #perl-Sys-Syscall.noarch
+require 'syscall.ph';
+BEGIN { plan tests => 37 }
 
 ###
 # functions
@@ -67,6 +69,7 @@ my $contid2      = int( rand( 1 << 63 ) );
 my $contidfilt   = int( rand( 1 << 63 ) );
 my $contid1net   = int( rand( 1 << 63 ) );
 my $contid2net   = int( rand( 1 << 63 ) );
+my $contidcap    = int( rand( 1 << 63 ) );
 
 ###
 # tests
@@ -381,6 +384,46 @@ ok( $contid1net_found, 1 );    # Was the contid1net message well-formed?
 ok( $contid2net_found, 1 );    # Was the contid2net message well-formed?
 
 ################################################################################
+# Test capcontid set
+# Start sleep to provide target task
+my $taskcap_pid = fork();
+my $resultcap;
+if ( not $taskcap_pid ) {
+    $!      = 0;
+    $result = syscall( &SYS_unshare, 0x10000000 );    #CLONE_NEWUSER
+    if ( $result == -1 && $1 == 0 ) {
+        print "syscall SYS_unshare failed with errno:" . $! . "\n";
+    }
+    sleep 2;
+    my $taskcapchild_pid = fork();
+    if ( not $taskcapchild_pid ) {
+        sleep 2;
+        exit;
+    }
+    open( my $contidfd, '>', "/proc/$taskcapchild_pid/audit_containerid" );
+    $contidfd->autoflush(1);
+    $resultcap = print $contidfd $contidcap;
+    close($contidfd);
+    if ( not $resultcap ) {
+        $resultcap = $!;
+    }
+    close($contidfd);
+    exit $resultcap;
+}
+sleep 1;
+
+# Test set
+open( $contidfd, '>', "/proc/$taskcap_pid/audit_capcontainerid" );
+$contidfd->autoflush(1);
+$result = print $contidfd "1\n";
+close($contidfd);
+ok($result);               # Did set capchild without init cap fail?
+ok( $taskcap_pid > 0 );    # Did taskcap start ok?
+my $wait_cap = wait();
+$resultcap = $? >> 8;
+ok( $resultcap != 1 );     # Did set fail with capcontid?
+
+################################################################################
 # Debug
 if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
     print "\ndebug: start\n";
@@ -411,6 +454,9 @@ if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
     }
     if ( !$contid2net_found ) {
         print "mark=$mark id=$id contid2net=$contid2net\n";
+    }
+    if ( !$resultcap != 1 ) {
+        print "taskcap_pid=$taskcap_pid resultcap=$resultcap\n";
     }
     print "debug: end\n\n\n";
 }
