@@ -6,9 +6,17 @@ addons:
   apt:
     packages:
       - astyle
-      - perltidy
       - python-pip
       - gcc-multilib
+
+before_install:
+  # FYI: known good with HEAD at 8551fc60fc515cd290ba38ee8c758c1f4df52b56
+  - git clone https://github.com/perltidy/perltidy.git perltidy
+  - |
+    (cd perltidy &&
+     perl Makefile.PL &&
+     make &&
+     sudo make install)
 
 install:
   - sudo pip install yapf
