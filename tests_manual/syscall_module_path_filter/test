@@ -74,6 +74,7 @@ my $msgdate       = "";
 my $line2;
 seek( $fh_out, 0, 0 );
 seek( $fh_err, 0, 0 );
+
 while ( $line = <$fh_out> ) {
 
     # test if we generate any audit records from the filter rule

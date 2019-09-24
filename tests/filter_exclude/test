@@ -13,7 +13,7 @@ use Time::HiRes qw(usleep);
 
 sub key_gen {
     my @chars = ( "A" .. "Z", "a" .. "z" );
-    my $key = "testsuite-" . time . "-";
+    my $key   = "testsuite-" . time . "-";
     $key .= $chars[ rand @chars ] for 1 .. 8;
     return $key;
 }
