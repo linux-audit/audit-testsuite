@@ -1,0 +1,101 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 3 }
+
+use File::Temp qw/ tempfile /;
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+my $AUDIT_BPF = 1334;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# set the socketcall filter
+my $key = key_gen();
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# connect
+system("auditctl -a always,exit -F arch=b64 -S bpf -k $key");
+
+# run the test
+system("$basedir/bpf");
+
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -ts recent -m $AUDIT_BPF | grep -q $key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# test if we generate any audit records from the filter rule
+my $result = system("ausearch -ts recent -m $AUDIT_BPF > $stdout 2> $stderr");
+ok( $result, 0 );
+
+my $line;
+my $found_load   = 0;
+my $found_unload = 0;
+my $ready        = 0;
+my $prog_id      = 0;
+
+while ( $line = <$fh_out> ) {
+
+    # find the first $key message and go from there
+    if ( !$ready && $line =~ /key="$key"/ ) {
+        $ready = 1;
+        next;
+    }
+
+    # find LOAD event with the $key
+    if ( $found_load == 0 && $line =~ /op=LOAD/ && $line =~ /prog-id=(\d+)/ ) {
+        $found_load = 1;
+        $prog_id    = $1;
+        next;
+    }
+
+    # find UNLOAD event with the proper $prog_id
+    if ( $line =~ /op=UNLOAD/ && $line =~ /prog-id=$prog_id/ ) {
+        $found_unload = 1;
+        last;
+    }
+}
+
+ok($found_load);
+ok($found_unload);
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
