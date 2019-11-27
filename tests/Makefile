@@ -28,7 +28,8 @@ TESTS := \
 	syscall_module \
 	syscall_socketcall \
 	user_msg \
-	fanotify
+	fanotify \
+	bpf
 
 # apply any ABI restrictions to the tests
 ifneq ($(MACHINE),$(filter i386 x86_64,$(MACHINE)))
