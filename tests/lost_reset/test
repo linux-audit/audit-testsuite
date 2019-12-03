@@ -150,7 +150,7 @@ while ( $line = <$fh_out> ) {
         }
     }
 }
-ok( $found_msg, 1 );    # Was the message well-formed?
+ok( $found_msg, 1 );              # Was the message well-formed?
 ok( $reset_rc == $reset_msg );    # Do the two lost values agree?
 
 if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
