@@ -1,6 +1,11 @@
-language: c
+# Travis CI configuration for audit-testsuite
 
-dist: xenial
+# https://docs.travis-ci.com/user/reference/bionic
+# https://wiki.ubuntu.com/Releases
+
+dist: bionic
+
+language: c
 
 addons:
   apt:
