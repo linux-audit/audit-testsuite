@@ -65,7 +65,7 @@ while ( $line = <$fh_out> ) {
     # test if we generate a USER record
     if ( $line =~ /^type=USER / ) {
         if (    $line =~ / pid=$pid /
-            and $line =~ / msg='Testing 1 2 3 $key / )
+            and $line =~ / msg='(text=)?Testing 1 2 3 $key / )
         {
             $found_msg = 1;
         }
@@ -77,4 +77,3 @@ ok($found_msg);
 # cleanup
 
 system("auditctl -D >& /dev/null");
-
