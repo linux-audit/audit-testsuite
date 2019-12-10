@@ -33,6 +33,11 @@ ifneq ($(MACHINE),$(filter i386 x86_64,$(MACHINE)))
 	TESTS := $(filter-out syscall_socketcall,$(TESTS))
 endif
 
+# tests not suitable for RHEL6
+ifeq ($(DISTRO), RHEL6)
+	TESTS := $(filter-out exec_name,$(TESTS))
+endif
+
 .PHONY: all test clean
 
 all: 
