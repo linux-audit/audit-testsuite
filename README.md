@@ -35,6 +35,7 @@ please follow the instructions below.
 	              perl-Test-Harness \
 	              perl-File-Which \
 	              perl-Time-HiRes \
+	              perl-Socket-Netlink \
 	              nmap-ncat \
 	              psmisc \
 	              liburing-devel
@@ -50,6 +51,7 @@ please follow the instructions below.
 	              perl-Test-Harness \
 	              perl-File-Which \
 	              perl-Time-HiRes \
+	              perl-Socket-Netlink \
 	              nmap-ncat \
 	              psmisc \
 	              liburing-devel

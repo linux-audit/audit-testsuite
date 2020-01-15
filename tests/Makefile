@@ -13,6 +13,7 @@ endif
 
 # all of the tests
 TESTS := \
+	amcast_joinpart \
 	backlog_wait_time_actual_reset \
 	bpf \
 	exec_execve \
