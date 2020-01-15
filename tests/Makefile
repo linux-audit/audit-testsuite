@@ -13,6 +13,7 @@ endif
 
 # all of the tests
 TESTS := \
+	amcast_joinpart \
 	exec_execve \
 	exec_name \
 	file_create \

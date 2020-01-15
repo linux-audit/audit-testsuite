@@ -1,0 +1,119 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 7 }
+
+use File::Temp qw/ tempfile /;
+use Socket;
+use Socket::Netlink qw( :DEFAULT pack_sockaddr_nl );
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_out2, my $stdout2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err2, my $stderr2 ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# limit ausearch to this test's events
+my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
+  localtime(time);
+$year += 1900;
+$mon  += 1;
+my $startdatetime = sprintf "%04d-%02d-%02d %02d:%02d:%02d", $year, $mon,
+  $mday, $hour, $min, $sec;
+
+# set the filter
+my $key = key_gen();
+my $result;
+
+# issue command to generate EVENT_LISTENER event
+my $sock;
+$result = socket( $sock, AF_NETLINK, SOCK_RAW, 9 );    # NETLINK_AUDIT
+ok($result);                                           # socket call succeeded?
+$result = bind( $sock, pack_sockaddr_nl( 0, 1 ) );
+ok($result);                                           # bind succeeded?
+$result = setsockopt( $sock, 270, 2, 1 )
+  ;    # SOL_NETLINK, NETLINK_DROP_MEMBERSHIP, AUDIT_NLGRP_READLOG
+ok($result);    # drop succeeded?
+close($sock);
+
+# create marker event and wait for it to ensure our events are in the log
+system("auditctl -m syncmarker-$key >/dev/null 2>&1");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# test if we generate any audit records from the filter rule
+$result = system(
+"LC_TIME=en_DK.utf8 ausearch -i -m 1335 -ts $startdatetime > $stdout 2> $stderr"
+);
+ok( $result, 0 );    # found records filtered on record type?
+
+# test if we generate the EVENT_LISTENER record
+my $line;
+my $line2;
+my $type;
+my $id                              = "";
+my $found_event_listener            = 0;
+my $found_event_listener_connect    = 0;
+my $found_event_listener_disconnect = 0;
+
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=(EVENT_LISTENER|UNKNOWN\[1335\]) / ) {
+        if ( $line =~ / nl-mcgrp=1 op=((dis|)connect) res=(yes|no)/ ) {
+            $found_event_listener = 1;
+            if ( $1 eq "connect" ) {
+                $found_event_listener_connect = 1;
+            }
+            if ( $1 eq "disconnect" ) {
+                $found_event_listener_disconnect = 1;
+            }
+        }
+    }
+}
+ok($found_event_listener);               # Found event_listener event?
+ok($found_event_listener_connect);       # Found connect event?
+ok($found_event_listener_disconnect);    # Found disconnect event?
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
