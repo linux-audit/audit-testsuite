@@ -47,8 +47,9 @@ system("auditctl -s > $cfgout");
 my $result;
 my $i;
 my $line;
-my $iterations = 50;
-for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
+my $iter_easy = 10;
+my $iter_hard = 5;
+for ( $i = 0 ; $i < $iter_easy + $iter_hard ; $i++ ) {    # iteration count
      # Kill the daemon, set the buffers low, set the wait time to 1ms, turn on auditing
     system("service auditd stop >/dev/null 2>&1");
     system("auditctl -D >/dev/null 2>&1");
@@ -65,10 +66,16 @@ for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
     chomp($ping_pid);
 
     # Add rule to generate audit queue events from floodping
-    $result =
-      system(
+    if ( $i < $iter_easy ) {
+        $result = system(
 "auditctl -a exit,always -F arch=b$abi_bits -S all -F pid=$ping_pid >/dev/null 2>&1"
-      );
+        );
+    }
+    else {
+        $result = system(
+            "auditctl -a exit,always -F arch=b$abi_bits -S all >/dev/null 2>&1"
+        );
+    }
 
     my $counter = 0;
     my $timeout = 50;
@@ -84,7 +91,7 @@ for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
         }
         if ( $lost > 0 ) {
             $counter = $timeout;
-            $i       = $iterations;
+            $i       = $iter_easy + $iter_hard;
         }
         else {
             sleep 0.1;
@@ -93,6 +100,10 @@ for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
     }
 
     kill 'TERM', $ping_pid;
+
+    # try to remove both rules just to be safe
+    system(
+        "auditctl -d exit,always -F arch=b$ENV{MODE} -S all >/dev/null 2>&1");
     system(
 "auditctl -d exit,always -F arch=b$abi_bits -S all -F pid=$ping_pid >/dev/null 2>&1"
     );
@@ -176,4 +187,5 @@ while ( $line = <$fh_cfg> ) {
         system("auditctl --backlog_wait_time $fields[1] >/dev/null 2>&1");
     }
 }
+sleep(1);
 system("service auditd restart 2>/dev/null");
