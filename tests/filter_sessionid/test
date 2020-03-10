@@ -20,6 +20,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 # reset audit
 system("auditctl -D >& /dev/null");
 
@@ -54,7 +56,7 @@ chomp($sessionid);
 # create a key and rule
 my $key = key_gen();
 $result = system(
-"auditctl -a always,exit -F arch=b$ENV{MODE} -F path=/tmp/$key -F sessionid=$sessionid -k $key"
+"auditctl -a always,exit -F arch=b$abi_bits -F path=/tmp/$key -F sessionid=$sessionid -k $key"
 );
 ok( $result, 0 );
 

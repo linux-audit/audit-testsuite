@@ -20,6 +20,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 # reset audit
 system("auditctl -D >& /dev/null");
 
@@ -42,9 +44,9 @@ my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
 # audit all open() syscalls on 64-bit systems
 my $key         = key_gen();
 my $result_open = system(
-    "auditctl -a always,exit -F arch=b$ENV{MODE} -S open -k $key 2> $stderr");
+    "auditctl -a always,exit -F arch=b$abi_bits -S open -k $key 2> $stderr");
 my $result_openat =
-  system("auditctl -a always,exit -F arch=b$ENV{MODE} -S openat -k $key");
+  system("auditctl -a always,exit -F arch=b$abi_bits -S openat -k $key");
 
 ok( $result_open == 0 or $result_openat == 0 );
 

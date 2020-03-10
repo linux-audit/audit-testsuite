@@ -20,6 +20,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 # reset audit
 system("auditctl -D >& /dev/null");
 
@@ -42,10 +44,10 @@ my $result;
 
 # connect
 system(
-"auditctl -a always,exit -F arch=b$ENV{MODE} -S init_module -S finit_module -k $key-load"
+"auditctl -a always,exit -F arch=b$abi_bits -S init_module -S finit_module -k $key-load"
 );
 system(
-"auditctl -a always,exit -F arch=b$ENV{MODE} -S delete_module -k $key-unload"
+    "auditctl -a always,exit -F arch=b$abi_bits -S delete_module -k $key-unload"
 );
 
 # run the test

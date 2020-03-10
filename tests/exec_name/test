@@ -20,6 +20,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 # try to find three test executables
 my @execs = ("") x 3;
 
@@ -78,13 +80,13 @@ sub do_test {
             }
         }
         system( "auditctl -a always,exit -F exe$op$execs[$exe] "
-              . "-F arch=b$ENV{MODE} -S exit_group -k $key" );
+              . "-F arch=b$abi_bits -S exit_group -k $key" );
     }
 
     # add a universal rule if no exit filters given
     if ( scalar @{$exit} == 0 ) {
         @expected = (1) x scalar @execs;
-        system( "auditctl -a always,exit -F arch=b$ENV{MODE} -S exit_group "
+        system( "auditctl -a always,exit -F arch=b$abi_bits -S exit_group "
               . "-k $key" );
     }
 

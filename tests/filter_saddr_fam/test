@@ -18,6 +18,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 # reset audit
 system("auditctl -D >/dev/null 2>&1");
 
@@ -49,12 +51,12 @@ my $result;
 my $rule;
 
 # set bad test rule
-$rule   = "always,exit -F arch=b$ENV{MODE} -S all -F saddr_fam=100 -F key=$key";
+$rule   = "always,exit -F arch=b$abi_bits -S all -F saddr_fam=100 -F key=$key";
 $result = system("auditctl -a $rule >/dev/null 2>&1");
 ok( $result ne 0 );
 
 # set test rule
-$rule   = "always,exit -F arch=b$ENV{MODE} -S all -F saddr_fam=2 -F key=$key";
+$rule   = "always,exit -F arch=b$abi_bits -S all -F saddr_fam=2 -F key=$key";
 $result = system("auditctl -a $rule >/dev/null 2>&1");
 ok( $result, 0 );
 

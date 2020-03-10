@@ -25,6 +25,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 # reset audit
 system("auditctl -D >& /dev/null");
 
@@ -48,7 +50,7 @@ my $key = key_gen();
 system("auditctl -D >& /dev/null");
 
 # connect
-system("auditctl -a always,exit -F arch=b$ENV{MODE} -S bpf -k $key");
+system("auditctl -a always,exit -F arch=b$abi_bits -S bpf -k $key");
 
 # run the test
 system("$basedir/bpf");

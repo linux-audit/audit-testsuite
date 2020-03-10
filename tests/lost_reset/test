@@ -18,6 +18,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
   localtime(time);
 $year += 1900;
@@ -65,7 +67,7 @@ for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
     # Add rule to generate audit queue events from floodping
     $result =
       system(
-"auditctl -a exit,always -F arch=b$ENV{MODE} -S all -F pid=$ping_pid >/dev/null 2>&1"
+"auditctl -a exit,always -F arch=b$abi_bits -S all -F pid=$ping_pid >/dev/null 2>&1"
       );
 
     my $counter = 0;
@@ -92,7 +94,7 @@ for ( $i = 0 ; $i < $iterations ; $i++ ) {    # iteration count
 
     kill 'TERM', $ping_pid;
     system(
-"auditctl -d exit,always -F arch=b$ENV{MODE} -S all -F pid=$ping_pid >/dev/null 2>&1"
+"auditctl -d exit,always -F arch=b$abi_bits -S all -F pid=$ping_pid >/dev/null 2>&1"
     );
 
     # Restart the daemon to collect messages in the log

@@ -21,6 +21,8 @@ sub key_gen {
 ###
 # setup
 
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
 # reset audit
 system("auditctl -D >& /dev/null");
 
@@ -112,8 +114,8 @@ $result = system(
 );
 ok( $result, 0 );
 
-$result = system(
-    "auditctl -a exit,always -F arch=b$ENV{MODE} -S all -F path=/tmp/$key");
+$result =
+  system("auditctl -a exit,always -F arch=b$abi_bits -S all -F path=/tmp/$key");
 ok( $result, 0 );
 
 open( my $tmpfile, ">", "/tmp/$key" );
