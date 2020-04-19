@@ -60,10 +60,11 @@ $result = system("id -Z >$subjout 2>/dev/null");
 ok( $result, 0 );
 my $subj = <$fh_subj>;
 chomp($subj);
-if ( $subj =~ /([^:]+):([^:]+):([^:]+):([^-]+)-([^-]+)/ ) {
+if ( $subj =~ /([^:]+):([^:]+):([^:]+):([^-]+)(?:-([^-]+))?/ ) {
     ( $subj_user, $subj_role, $subj_type, $subj_sen, $subj_clr ) =
       ( $1, $2, $3, $4, $5 );
 }
+$subj_clr = $subj_sen unless defined $subj_clr;
 
 # try adding rule for each supported field type and test for (a few)
 # unsupported types
@@ -132,7 +133,7 @@ for ( my $i = 0 ; $i < 10 ; $i++ ) {
 
 # test for the SYSCALL message provoked by creat
 $result = system(
-"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj_user:$subj_role:$subj_type:$subj_sen-$subj_clr -ts recent > $stdout 2> /dev/null"
+"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj -ts recent > $stdout 2> /dev/null"
 );
 ok( $result, 256 );
 
@@ -161,7 +162,7 @@ for ( my $i = 0 ; $i < 10 ; $i++ ) {
 
 # test for the SYSCALL message provoked by unlink
 $result = system(
-"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj_user:$subj_role:$subj_type:$subj_sen-$subj_clr -ts recent > $stdout2 2> /dev/null"
+"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj -ts recent > $stdout2 2> /dev/null"
 );
 ok( $result, 0 );
 
