@@ -7,7 +7,8 @@ BEGIN { plan tests => 7 }
 
 use File::Temp qw/ tempfile /;
 use Socket;
-use Socket::Netlink qw( :DEFAULT pack_sockaddr_nl );
+
+#use Socket::Netlink qw( :DEFAULT pack_sockaddr_nl );
 
 my $basedir = $0;
 $basedir =~ s|(.*)/[^/]*|$1|;
@@ -63,12 +64,26 @@ my $result;
 
 # issue command to generate EVENT_LISTENER event
 my $sock;
-$result = socket( $sock, AF_NETLINK, SOCK_RAW, 9 );    # NETLINK_AUDIT
-ok($result);                                           # socket call succeeded?
-$result = bind( $sock, pack_sockaddr_nl( 0, 1 ) );
-ok($result);                                           # bind succeeded?
-$result = setsockopt( $sock, 270, 2, 1 )
-  ;    # SOL_NETLINK, NETLINK_DROP_MEMBERSHIP, AUDIT_NLGRP_READLOG
+my $AF_NETLINK              = 16;
+my $NETLINK_AUDIT           = 9;
+my $AUDIT_NLGRP_READLOG     = 1;
+my $SOL_NETLINK             = 270;
+my $NETLINK_DROP_MEMBERSHIP = 2;
+$result = socket( $sock, $AF_NETLINK, SOCK_RAW, $NETLINK_AUDIT );
+ok($result);    # socket call succeeded?
+
+#$result = bind( $sock, pack_sockaddr_nl( 0, $AUDIT_NLGRP_READLOG ) );
+;    #my( $hex ) = unpack( 'H*', pack_sockaddr_nl(0,$AUDIT_NLGRP_READLOG) );
+;    #print "pack_sockaddr_nl=$hex\n";
+;    # from include/uapi/linux/netlink.h:struct sockaddr_nl
+; # nl_family(u16):AF_NETLINK, nl_pad(u16):0, nl_pid(u32):0, nl_groups(u32):AUDIT_NLGRP_READLOG
+my $snl = pack( "SSLL", $AF_NETLINK, 0, 0, $AUDIT_NLGRP_READLOG );
+;    #my( $hex2 ) = unpack( 'H*', $snl );
+;    #print "             snl=$hex2\n";
+$result = bind( $sock, $snl );
+ok($result);    # bind succeeded?
+$result = setsockopt( $sock, $SOL_NETLINK, $NETLINK_DROP_MEMBERSHIP,
+    $AUDIT_NLGRP_READLOG );
 ok($result);    # drop succeeded?
 close($sock);
 

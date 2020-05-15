@@ -35,7 +35,6 @@ please follow the instructions below.
 	              perl-Test-Harness \
 	              perl-File-Which \
 	              perl-Time-HiRes \
-	              perl-Socket-Netlink \
 	              nmap-ncat
 
 ### Fedora
@@ -49,7 +48,6 @@ please follow the instructions below.
 	              perl-Test-Harness \
 	              perl-File-Which \
 	              perl-Time-HiRes \
-	              perl-Socket-Netlink \
 	              nmap-ncat
 
 ### Debian Based Systems
