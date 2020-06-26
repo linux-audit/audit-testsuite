@@ -23,7 +23,7 @@ my $selinux_mls  = $4;
 
 # Sanity checks prior to test execution.
 die("These tests are intended to be run as root\n") unless $unix_user eq "root";
-die("The auditctl tool cannot be found\n") unless which "auditctl";
+die("The auditctl tool cannot be found\n")          unless which "auditctl";
 
 print "Running as   user    $unix_user\n";
 print
