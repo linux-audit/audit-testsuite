@@ -148,8 +148,8 @@ sub do_test {
 
 do_test( [ { exe => 0, op => "=" } ],  [] );
 do_test( [ { exe => 1, op => "!=" } ], [] );
-do_test( [], [ { exe => 0, op => "!=" } ] );
-do_test( [], [ { exe => 1, op => "=" } ] );
+do_test( [],                           [ { exe => 0, op => "!=" } ] );
+do_test( [],                           [ { exe => 1, op => "=" } ] );
 
 do_test( [ { exe => 1, op => "!=" } ], [ { exe => 2, op => "=" } ] );
 
