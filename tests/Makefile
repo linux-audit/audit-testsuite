@@ -13,6 +13,7 @@ endif
 
 # all of the tests
 TESTS := \
+	backlog_wait_time_actual_reset \
 	exec_execve \
 	exec_name \
 	file_create \
