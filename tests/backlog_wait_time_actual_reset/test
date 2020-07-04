@@ -1,0 +1,195 @@
+#!/usr/bin/perl
+
+use strict;
+use File::Temp qw/ tempdir tempfile /;
+use Test;
+BEGIN { plan tests => 5 }
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
+my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
+  localtime(time);
+$year += 1900;
+$mon  += 1;
+my $startdate = "$year-$mon-$mday";
+my $starttime = "$hour:$min:$sec";
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+# store audit kernel config
+( my $fh_cfg, my $cfgout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-cfg-XXXX',
+    UNLINK   => 1
+);
+system("auditctl -s > $cfgout");
+
+my $result;
+my $i;
+my $line;
+my $iter_easy = 10;
+my $iter_hard = 5;
+for ( $i = 0 ; $i < $iter_easy + $iter_hard ; $i++ ) {    # iteration count
+     # Kill the daemon, set the buffers low, set the wait time to 1ms, turn on auditing
+    system("service auditd stop >/dev/null 2>&1");
+    system("auditctl -D >/dev/null 2>&1");
+    system("auditctl -b 10 >/dev/null 2>&1");
+    system("auditctl --backlog_wait_time 50 >/dev/null 2>&1");
+    system("auditctl -e 1 >/dev/null 2>&1");
+
+    ###
+    # tests
+    # Start floodping to generate activity
+    seek( $fh_out, 0, 0 );
+    system("ping -f 127.0.0.1 >/dev/null 2>&1 & echo \$! >$stdout");
+    my $ping_pid = <$fh_out>;
+    chomp($ping_pid);
+
+    # Add rule to generate audit queue events from floodping
+    if ( $i < $iter_easy ) {
+        $result = system(
+"auditctl -a exit,always -F arch=b$abi_bits -S all -F pid=$ping_pid >/dev/null 2>&1"
+        );
+    }
+    else {
+        $result = system(
+            "auditctl -a exit,always -F arch=b$abi_bits -S all >/dev/null 2>&1"
+        );
+    }
+
+    my $counter = 0;
+    my $timeout = 50;
+    while ( $counter < $timeout ) {
+        my $backlog_wait_time_actual = 0;
+        seek( $fh_out, 0, 0 );
+        system("auditctl -s >$stdout 2>/dev/null");
+        while ( $line = <$fh_out> ) {
+            if ( $line =~ /^backlog_wait_time_actual ([0-9]+)/ ) {
+                $backlog_wait_time_actual = $1;
+                last;
+            }
+        }
+        if ( $backlog_wait_time_actual > 0 ) {
+            $counter = $timeout;
+            $i       = $iter_easy + $iter_hard;
+        }
+        else {
+            sleep 0.1;
+            $counter += 1;
+        }
+    }
+
+    kill 'TERM', $ping_pid;
+
+    # try to remove both rules just to be safe
+    system(
+        "auditctl -d exit,always -F arch=b$ENV{MODE} -S all >/dev/null 2>&1");
+    system(
+"auditctl -d exit,always -F arch=b$abi_bits -S all -F pid=$ping_pid >/dev/null 2>&1"
+    );
+
+    # Restart the daemon to collect messages in the log
+    system("service auditd start >/dev/null 2>&1");
+}
+
+sleep 1;
+
+my $status_backlog_wait_time_actual;
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    seek( $fh_out, 0, 0 );
+    system(
+"echo -n \"auditctl -s: \" >$stdout; auditctl -s|grep backlog_wait_time_actual >>$stdout"
+    );
+    $status_backlog_wait_time_actual = <$fh_out>;
+}
+
+# send the reset backlog wait time actual message
+seek( $fh_out, 0, 0 );
+$result =
+  system("auditctl --reset_backlog_wait_time_actual >$stdout 2>$stderr");
+ok( $result, 0 );       # Was the reset command successful?
+<$fh_err> =~ /backlog_wait_time_actual: ([0-9]+)/;
+my $reset_rc = $1;
+ok( $reset_rc > 0 );    # Was the backlog wait time actual value non-zero?
+
+# make sure the records had a chance to bubble through to the logs
+my $key = key_gen();
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# find the config change event
+seek( $fh_out, 0, 0 );
+seek( $fh_err, 0, 0 );
+$result = system(
+"LC_TIME=\"en_DK.utf8\" ausearch --start $startdate $starttime -i -m CONFIG_CHANGE >$stdout 2>$stderr"
+);
+ok( $result, 0 );    # Was an event found?
+
+# test if we generate the backlog wait time actual reset record correctly
+my $found_msg = 0;
+my $reset_msg = 0;
+while ( $line = <$fh_out> ) {
+
+    # find the CONFIG_CHANGE record
+    if ( $line =~ /^type=CONFIG_CHANGE / ) {
+
+        # find the backlog wait time actual value
+        if ( $line =~ / backlog_wait_time_actual=0 old=([0-9]+) / ) {
+            $reset_msg = $1;
+            $found_msg = 1;
+        }
+    }
+}
+ok( $found_msg, 1 );    # Was the message well-formed?
+ok( $reset_rc == $reset_msg )
+  ;                     # Do the two backlog wait time actual values agree?
+
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    if ( !$reset_rc || !$reset_msg || $reset_rc != $reset_msg ) {
+        print
+          "status_backlog_wait_time_actual: $status_backlog_wait_time_actual";
+        print "reset_rc: $reset_rc\n";
+        print "reset_msg: $reset_msg\n";
+        print "loop completed $i times\n";
+    }
+    else { print "reset_msg $reset_msg\n"; }
+}
+
+###
+# cleanup
+while ( $line = <$fh_cfg> ) {
+    my @fields = split /\s+/, $line;
+    if ( $fields[0] eq "backlog_limit" ) {
+        system("auditctl -b $fields[1] >/dev/null 2>&1");
+    }
+    if ( $fields[0] eq "backlog_wait_time" ) {
+        system("auditctl --backlog_wait_time $fields[1] >/dev/null 2>&1");
+    }
+}
+sleep(1);
+system("service auditd restart 2>/dev/null");
