@@ -125,7 +125,7 @@ if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
 # send the reset lost message
 seek( $fh_out, 0, 0 );
 $result = system("auditctl --reset-lost >$stdout 2>$stderr");
-ok( $result, 0 );    # Was the reset command successful?
+ok( $result, 0 );       # Was the reset command successful?
 <$fh_err> =~ /lost: ([0-9]+)/;
 my $reset_rc = $1;
 ok( $reset_rc > 0 );    # Was the lost value non-zero?
