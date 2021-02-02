@@ -35,7 +35,8 @@ please follow the instructions below.
 	              perl-Test-Harness \
 	              perl-File-Which \
 	              perl-Time-HiRes \
-	              nmap-ncat
+	              nmap-ncat \
+	              psmisc
 
 ### Fedora
 
@@ -48,7 +49,8 @@ please follow the instructions below.
 	              perl-Test-Harness \
 	              perl-File-Which \
 	              perl-Time-HiRes \
-	              nmap-ncat
+	              nmap-ncat \
+	              psmisc
 
 ### Debian Based Systems
 
@@ -61,7 +63,8 @@ below:
 	                  libc6-i386 \
 	                  libc6-dev-i386 \
 	                  perl-modules \
-	                  netcat
+	                  netcat \
+	                  psmisc
 
 After the dependencies are installed you should ensure that BASH is installed
 on the system and that /bin/sh points to BASH, not Dash:

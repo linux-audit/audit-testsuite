@@ -49,9 +49,10 @@ my $i;
 my $line;
 my $iter_easy = 10;
 my $iter_hard = 5;
-for ( $i = 0 ; $i < $iter_easy + $iter_hard ; $i++ ) {    # iteration count
-     # Kill the daemon, set the buffers low, set the wait time to 1ms, turn on auditing
-    system("service auditd stop >/dev/null 2>&1");
+for ( $i = 0 ; $i < $iter_easy + $iter_hard ; $i++ ) {
+
+    # set the worst case scenario for the audit backlog
+    system("killall -STOP auditd >/dev/null 2>&1");
     system("auditctl -D >/dev/null 2>&1");
     system("auditctl -b 1 >/dev/null 2>&1");
     system("auditctl --backlog_wait_time 1 >/dev/null 2>&1");
@@ -108,8 +109,8 @@ for ( $i = 0 ; $i < $iter_easy + $iter_hard ; $i++ ) {    # iteration count
 "auditctl -d exit,always -F arch=b$abi_bits -S all -F pid=$ping_pid >/dev/null 2>&1"
     );
 
-    # Restart the daemon to collect messages in the log
-    system("service auditd start >/dev/null 2>&1");
+    # resume the daemon to collect messages in the log
+    system("killall -CONT auditd >/dev/null 2>&1");
 }
 
 sleep 1;
