@@ -7,6 +7,9 @@ BEGIN { plan tests => 3 }
 
 use File::Temp qw/ tempdir tempfile /;
 
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
 ###
 # functions
 
@@ -42,17 +45,24 @@ my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
 # tests
 
 # audit all open() syscalls on 64-bit systems
-my $key         = key_gen();
+my $key = key_gen();
+my $result;
 my $result_open = system(
     "auditctl -a always,exit -F arch=b$abi_bits -S open -k $key 2> $stderr");
 my $result_openat =
   system("auditctl -a always,exit -F arch=b$abi_bits -S openat -k $key");
-
-ok( $result_open == 0 or $result_openat == 0 );
+my $result_openat2 =
+  system("auditctl -a always,exit -F arch=b$abi_bits -S 437 -k $key");  #openat2
+ok( $result_open == 0 or $result_openat == 0 or $result_openat2 == 0 );
 
 # create a new file
 ( my $fh, my $filename ) =
   tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
+
+system("$basedir/openat2 $dir file-openat2");
+if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
+    system("echo Contents of $dir:;ls -ltr $dir");
+}
 
 # make sure the records had a chance to bubble through to the logs
 system("auditctl -m sync-$key");
@@ -64,7 +74,7 @@ for ( my $i = 0 ; $i < 10 ; $i++ ) {
 }
 
 # test if we generate any audit records
-my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+$result = system("ausearch -i -k $key > $stdout 2> $stderr");
 ok( $result, 0 );
 
 # test if we generate the SYSCALL record correctly
@@ -73,10 +83,8 @@ my $found_syscall = 0;
 my $found_parent  = 0;
 my $found_create  = 0;
 while ( $line = <$fh_out> ) {
-
-    # test if we generate a SYSCALL record
     if ( $line =~ /^type=SYSCALL /
-        and ( $line =~ / syscall=open(at)? / ) )
+        and ( $line =~ / syscall=open(at|at2)? / ) )
     {
         $found_syscall = 1;
     }
