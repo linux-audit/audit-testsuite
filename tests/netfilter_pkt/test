@@ -133,6 +133,9 @@ while ( $line = <$fh_out> ) {
             {
                 $found[$_] = 1;
                 $fields[$_] += () = $line =~ / [^ =]*=[^ =]*/g;
+                if ( $line =~ / record=1 / ) {
+                    $fields = 6;
+                }
             }
             else {
                 print $line;

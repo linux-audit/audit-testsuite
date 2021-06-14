@@ -29,6 +29,7 @@ TESTS := \
 	syscall_module \
 	syscall_socketcall \
 	time_change \
+	containerid \
 	user_msg \
 	fanotify \
 	bpf
