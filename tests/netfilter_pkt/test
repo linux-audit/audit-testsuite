@@ -36,9 +36,11 @@ system("auditctl -D >& /dev/null");
 
 ###
 # tests
-my $port = "42424";
-my @tests =
-  ( "ipv4_icmp", "ipv6_icmp", "ipv4_udp", "ipv6_udp", "ipv4_tcp", "ipv6_tcp", );
+my $port  = "42424";
+my @tests = (
+    "ipv4_icmp", "ipv6_icmp", "ipv4_udp", "ipv6_udp",
+    "ipv4_tcp",  "ipv6_tcp",
+);
 my @fam   = ( "",          "6",     "",          "6",     "",      "6" );
 my @chain = ( "INPUT",     "INPUT", "INPUT",     "INPUT", "INPUT", "INPUT" );
 my @saddr = ( "127.0.0.1", "::1",   "127.0.0.1", "::1",   "127.0.0.1", "::1" );
