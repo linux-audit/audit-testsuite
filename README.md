@@ -2,7 +2,7 @@ Basic Audit Regression Test Suite for the Linux Kernel
 ===============================================================================
 https://github.com/linux-audit/audit-testsuite
 
-[![Build Status](https://img.shields.io/travis/linux-audit/audit-testsuite/master.svg)](https://travis-ci.org/linux-audit/audit-testsuite)
+[![Build Status](https://github.com/linux-audit/audit-testsuite/workflows/Continuous%20Integration/badge.svg?branch=main)](https://github.com/linux-audit/audit-testsuite/actions)
 
 The audit-testsuite project provides a simple, self-contained regression test
 suite for the Linux Kernel's audit subsystem.

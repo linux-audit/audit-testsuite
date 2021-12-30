@@ -1,0 +1,31 @@
+#
+# Github Action to setup the audit-testsuite
+#
+# Copyright (c) 2021 Microsoft Corporation <paulmoore@microsoft.com>
+# Author: Paul Moore <paul@paul-moore.com>
+#
+
+name: Setup the audit-testsuite
+description: "Install CI dependencies for the audit-testsuite"
+runs:
+  using: "composite"
+  steps:
+  - run: sudo apt-get install -y build-essential gcc-multilib python3-pip
+    shell: bash
+  - run: sudo apt-get install -y astyle
+    shell: bash
+  - run: |
+      # NOTE: the distro package isn't current enough (ubuntu-20.04)
+      git clone https://github.com/perltidy/perltidy.git perltidy
+      cd perltidy
+      perl Makefile.PL
+      make
+      sudo make install
+      echo "/usr/local/bin" >> $GITHUB_PATH
+    shell: bash
+  - run: |
+      # NOTE: the distro package isn't current enough (ubuntu-20.04)
+      sudo python3 -m pip install --upgrade pip
+      sudo python3 -m pip install yapf
+      echo "$HOME/.local/bin" >> $GITHUB_PATH
+    shell: bash

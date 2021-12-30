@@ -1,0 +1,31 @@
+#
+# Github CI Action for the audit-testsuite
+#
+# Copyright (c) 2021 Microsoft Corporation <paulmoore@microsoft.com>
+# Author: Paul Moore <paul@paul-moore.com>
+#
+
+name: Continuous Integration
+on: ["push", "pull_request"]
+
+jobs:
+  syntax:
+    name: Check Syntax
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout from GitHub
+      uses: actions/checkout@v2
+    - name: Setup
+      uses: ./.github/actions/setup
+    - name: Syntax Checker
+      run: ./tools/check-syntax -f && git diff --exit-code
+  build:
+    name: Build Tests
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout from GitHub
+      uses: actions/checkout@v2
+    - name: Setup
+      uses: ./.github/actions/setup
+    - name: Build
+      run: make
