@@ -36,7 +36,8 @@ please follow the instructions below.
 	              perl-File-Which \
 	              perl-Time-HiRes \
 	              nmap-ncat \
-	              psmisc
+	              psmisc \
+	              liburing-devel
 
 ### Fedora
 
@@ -50,7 +51,8 @@ please follow the instructions below.
 	              perl-File-Which \
 	              perl-Time-HiRes \
 	              nmap-ncat \
-	              psmisc
+	              psmisc \
+	              liburing-devel
 
 ### Debian Based Systems
 
@@ -64,7 +66,8 @@ below:
 	                  libc6-dev-i386 \
 	                  perl-modules \
 	                  netcat \
-	                  psmisc
+	                  psmisc \
+	                  liburing-dev
 
 After the dependencies are installed you should ensure that BASH is installed
 on the system and that /bin/sh points to BASH, not Dash:

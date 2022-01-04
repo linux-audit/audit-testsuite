@@ -15,6 +15,14 @@ runs:
   - run: sudo apt-get install -y astyle
     shell: bash
   - run: |
+      # NOTE: liburing not packaged for ubuntu-20.04
+      git clone https://github.com/axboe/liburing.git liburing
+      cd liburing
+      ./configure
+      make
+      sudo make install
+    shell: bash
+  - run: |
       # NOTE: the distro package isn't current enough (ubuntu-20.04)
       git clone https://github.com/perltidy/perltidy.git perltidy
       cd perltidy
