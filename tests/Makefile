@@ -32,7 +32,8 @@ TESTS := \
 	time_change \
 	user_msg \
 	fanotify \
-	bpf
+	bpf \
+	io_uring
 
 # apply any ABI restrictions to the tests
 ifneq ($(MACHINE),$(filter i386 x86_64,$(MACHINE)))

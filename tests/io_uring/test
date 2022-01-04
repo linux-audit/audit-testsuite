@@ -1,0 +1,95 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 5 }
+
+use File::Temp qw/ tempfile /;
+
+my $basedir = $0;
+$basedir =~ s|(.*)/[^/]*|$1|;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+my $key = key_gen();
+
+# clear any filters
+system("auditctl -D >& /dev/null");
+
+# set our io_uring filters
+system("auditctl -a exit,always -F arch=b$abi_bits -S io_uring_setup -k $key");
+system("auditctl -a exit,always -F arch=b$abi_bits -S io_uring_enter -k $key");
+
+# run the "t1" test
+system("$basedir/iouring t1");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -k $key >& /dev/null") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# test if we generate any basic audit records from the filter rule
+my $result = system("ausearch -i -ts recent -k $key > $stdout 2> $stderr");
+ok( $result, 0 );
+
+my $line;
+my $found_sc_setup  = 0;
+my $found_sc_enter  = 0;
+my $found_uop_open  = 0;
+my $found_uop_close = 0;
+
+# find the io_uring syscalls and io_uring ops
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /syscall=io_uring_setup/ ) {
+        $found_sc_setup = 1;
+    }
+    if ( $line =~ /syscall=io_uring_enter/ ) {
+        $found_sc_enter = 1;
+    }
+    if ( $line =~ /uring_op=18/ || $line =~ /uring_op=openat/ ) {
+        $found_uop_open = 1;
+    }
+    if ( $line =~ /uring_op=19/ || $line =~ /uring_op=close/ ) {
+        $found_uop_close = 1;
+    }
+}
+ok($found_sc_setup);
+ok($found_sc_enter);
+ok($found_uop_open);
+ok($found_uop_close);
+
+###
+# cleanup
+
+system("service auditd restart 2>/dev/null");
