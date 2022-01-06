@@ -48,7 +48,7 @@ system("auditctl -D >& /dev/null");
 
 my $result;
 
-# discover our sesssion ID
+# discover our session ID
 system("cat /proc/self/sessionid > $sesout");
 my $sessionid = <$fh_ses>;
 chomp($sessionid);

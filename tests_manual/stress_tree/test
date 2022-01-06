@@ -73,7 +73,7 @@ sub umount_all {
 # Mount and unmount filesystems. We pick random leaf mount so that sometimes
 # a leaf mount point root inode will gather more tags from different trees
 # and sometimes we will be quicker in unmounting all instances of leaf and
-# thus excercise inode evistion path
+# thus exercise inode evistion path
 sub run_mount {
     my ( $dir, $dirs ) = @_;
 

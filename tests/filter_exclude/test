@@ -131,7 +131,7 @@ for ( my $i = 0 ; $i < 10 ; $i++ ) {
     sleep(0.2);
 }
 
-# test for the SYSCALL message provoked by creat
+# test for the SYSCALL message provoked by creating the file
 $result = system(
 "ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj -ts recent > $stdout 2> /dev/null"
 );
