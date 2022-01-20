@@ -85,9 +85,10 @@ ok( $result, 0 );    # Was the rule accepted?
 
 # Create task to which to attach
 seek( $fh_out, 0, 0 );
-system("sleep .1 >/dev/null 2>&1 & echo \$! >$stdout");
+system("sleep 1 >/dev/null 2>&1 & echo \$! >$stdout");
 my $task2_pid = <$fh_out>;
 chomp($task2_pid);
+sleep .5;
 
 # Generate a ptrace event
 $result = system("strace -p $task2_pid >/dev/null 2>&1");
