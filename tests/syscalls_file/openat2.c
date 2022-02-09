@@ -29,27 +29,36 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-/* not available yet on travis-ci.org
- * #include <linux/openat2.h>
- */
+/* linux/openat2.h not available yet on travis-ci.org */
+#if 0
+#include <linux/openat2.h>
+#else
+#include <linux/types.h>
 struct open_how {
-	long long unsigned flags;
-	long long unsigned mode;
-	long long unsigned resolve;
+	__u64 flags;
+	__u64 mode;
+	__u64 resolve;
 };
 #define RESOLVE_NO_MAGICLINKS	0x02
 #define RESOLVE_BENEATH		0x08
+#endif
 
 #include <sys/syscall.h>
 
+#ifndef __NR_openat2
+/* on all current Linux ABIs openat2() is 437 */
+#define __NR_openat2		437
+#endif
+
 int main(int argc, char **argv)
 {
-	char *test_dir = argv[1] ? : ".";
 	int dir_fd, file_fd;
+	char *test_dir = argv[1] ? : ".";
 	char *file_name = argv[2] ? : "file-openat2";
-	struct open_how how = { .flags = O_CREAT | O_RDWR | O_EXCL,
-		       .mode = 0600,
-		       .resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS,
+	struct open_how how = {
+		.flags = O_CREAT | O_RDWR | O_EXCL,
+		.mode = 0600,
+		.resolve = RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS,
 	};
 
 	dir_fd = open(test_dir, O_RDONLY | O_DIRECTORY);
@@ -58,13 +67,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	/* Try to create a file.  */
-	printf("create file=%s in directory=%s with flags=0%llo, mode=0%llo, resolve=0x%0llx\n",
-	       file_name, test_dir, how.flags, how.mode, how.resolve);
-	file_fd = syscall(437, dir_fd, file_name, &how, sizeof(how)); //__NR_openat2
+	printf("create file=%s/%s with"
+	       " flags=0%llo, mode=0%llo, resolve=0x%0llx\n",
+	       test_dir, file_name, how.flags, how.mode, how.resolve);
+	file_fd = syscall(__NR_openat2, dir_fd, file_name, &how, sizeof(how));
 	if (file_fd == -1) {
 		if (errno == ENOSYS) {
-			printf("openat2 function not supported\n");
+			printf("openat2 syscall not supported\n");
 			return 2;
 		}
 		printf("file creation failed\n");
