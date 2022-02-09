@@ -91,13 +91,14 @@ while ( $line = <$fh_out> ) {
     {
         $found_syscall = 1;
     }
-    if ( $line =~ /^type=OPENAT2 / )
-    {
+    if ( $line =~ /^type=OPENAT2 / ) {
         $found_openat2 = 1;
     }
 }
-ok($found_syscall &&
-   (($result_openat2 != 0) || ($result_openat2 == 0 && $found_openat2 == 1)));
+ok(
+    $found_syscall && ( ( $result_openat2 != 0 )
+        || ( $result_openat2 == 0 && $found_openat2 == 1 ) )
+);
 
 ###
 # cleanup
