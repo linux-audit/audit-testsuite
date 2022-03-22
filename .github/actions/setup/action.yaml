@@ -10,6 +10,8 @@ description: "Install CI dependencies for the audit-testsuite"
 runs:
   using: "composite"
   steps:
+  - run: sudo apt-get update
+    shell: bash
   - run: sudo apt-get install -y build-essential gcc-multilib python3-pip
     shell: bash
   - run: sudo apt-get install -y astyle
