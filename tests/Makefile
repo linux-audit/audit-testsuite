@@ -14,8 +14,10 @@ endif
 # all of the tests
 TESTS := \
 	backlog_wait_time_actual_reset \
+	bpf \
 	exec_execve \
 	exec_name \
+	fanotify \
 	file_create \
 	file_delete \
 	file_rename \
@@ -30,9 +32,7 @@ TESTS := \
 	syscall_module \
 	syscall_socketcall \
 	time_change \
-	user_msg \
-	fanotify \
-	bpf
+	user_msg
 
 # apply any ABI restrictions to the tests
 ifneq ($(MACHINE),$(filter i386 x86_64,$(MACHINE)))
