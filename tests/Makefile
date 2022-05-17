@@ -24,6 +24,7 @@ TESTS := \
 	filter_exclude \
 	filter_saddr_fam \
 	filter_sessionid \
+	io_uring \
 	login_tty \
 	lost_reset \
 	netfilter_pkt \
