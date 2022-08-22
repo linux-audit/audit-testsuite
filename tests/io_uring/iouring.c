@@ -68,6 +68,10 @@
 
 #include <liburing.h>
 
+#ifndef IORING_OP_URING_CMD
+#define IORING_OP_URING_CMD			46
+#endif
+
 struct urt_config {
 	struct io_uring ring;
 	struct io_uring_params ring_params;
@@ -452,6 +456,50 @@ int uring_op_a(struct io_uring *ring, int personality, const char *path)
 }
 
 /**
+ * An io_uring test
+ * @param ring the io_uring pointer
+ *
+ * This function executes an io_uring test, see the function body for more
+ * details.  Returns 0 on success, negative values on failure.
+ */
+int uring_op_b(struct io_uring *ring)
+{
+	int rc;
+	int fd;
+	struct io_uring_sqe *sqe;
+	struct io_uring_cqe *cqe;
+
+	fd = open("/dev/null", O_RDWR);
+	if (fd < 0)
+		fatal("open(/dev/null) failed");
+
+	/*
+	 * command
+	 */
+
+	sqe = io_uring_get_sqe(ring);
+	if (!sqe)
+		fatal("io_uring_get_sqe(cmd)");
+	sqe->opcode = IORING_OP_URING_CMD;
+	sqe->fd = fd;
+
+	rc = io_uring_submit(ring);
+	if (rc < 0)
+		fatal("io_uring_submit(cmd)");
+
+	rc = io_uring_wait_cqe(ring, &cqe);
+	if (rc < 0)
+		fatal("io_uring_wait_cqe(cmd)");
+	if (cqe->res)
+		fatal("IORING_OP_URING_CMD");
+	io_uring_cqe_seen(ring, cqe);
+
+	printf(">>> io_uring cmd(): OK\n");
+
+	return 0;
+}
+
+/**
  * The main entrypoint to the test program
  * @param argc number of command line options
  * @param argv the command line options array
@@ -465,7 +513,8 @@ int main(int argc, char *argv[])
 
 	enum { TST_UNKNOWN,
 	       TST_SQPOLL,
-	       TST_T1_PARENT, TST_T1_CHILD
+	       TST_T1_PARENT, TST_T1_CHILD,
+	       TST_T2,
 	     } tst_method;
 
 	/* parse the command line and do some sanity checks */
@@ -478,6 +527,8 @@ int main(int argc, char *argv[])
 			tst_method = TST_T1_PARENT;
 		else if (!strcmp(argv[1], "t1_child"))
 			tst_method = TST_T1_CHILD;
+		else if (!strcmp(argv[1], "t2"))
+			tst_method = TST_T2;
 	}
 	if (tst_method == TST_UNKNOWN) {
 		fprintf(stderr, "usage: %s <method> ... \n", argv[0]);
@@ -487,11 +538,29 @@ int main(int argc, char *argv[])
 	/* simple header */
 	printf(">>> running as PID = %d\n", getpid());
 	printf(">>> LSM/SELinux = %s\n", selinux_current());
+	printf(">>> test method = ");
+	switch (tst_method) {
+	case TST_SQPOLL:
+		printf("SQPOLL\n");
+		break;
+	case TST_T1_PARENT:
+		printf("T1_PARENT\n");
+		break;
+	case TST_T1_CHILD:
+		printf("T1_CHILD\n");
+		break;
+	case TST_T2:
+		printf("T2\n");
+		break;
+	default:
+		printf("UNKNOWN\n");
+	}
 
 	/*
 	 * test setup (if necessary)
 	 */
-	if (tst_method == TST_SQPOLL || tst_method == TST_T1_PARENT) {
+	if (tst_method == TST_SQPOLL || tst_method == TST_T1_PARENT ||
+	    tst_method == TST_T2) {
 		/* create an io_uring and prepare it for optional sharing */
 		int flags;
 
@@ -584,6 +653,10 @@ int main(int argc, char *argv[])
 		rc = uring_op_a(ring, cfg_p->ring_creds, "/tmp/iouring.4.txt");
 		if (rc < 0)
 			fatal("uring_op_a(\"/tmp/iouring.4.txt\")");
+	} else if (tst_method == TST_T2) {
+		rc = uring_op_b(ring);
+		if (rc < 0)
+			fatal("uring_op_b()");
 	}
 
 	/*
