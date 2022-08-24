@@ -233,6 +233,7 @@ int uring_import(int fd, struct io_uring *ring, struct io_uring_params *params)
 	ring->flags = params->flags;
 	ring->features = params->features;
 	ring->ring_fd = fd;
+	ring->enter_ring_fd = fd;
 
 	ring->sq.ring_sz = params->sq_off.array +
 			   params->sq_entries * sizeof(unsigned);
