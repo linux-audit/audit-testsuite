@@ -259,6 +259,8 @@ int uring_import(int fd, struct io_uring *ring, struct io_uring_params *params)
 	ring->sq.kring_mask = ring->sq.ring_ptr + params->sq_off.ring_mask;
 	ring->sq.kring_entries = ring->sq.ring_ptr +
 				 params->sq_off.ring_entries;
+	ring->sq.ring_mask = *ring->sq.kring_mask;
+	ring->sq.ring_entries = *ring->sq.kring_entries;
 	ring->sq.kflags = ring->sq.ring_ptr + params->sq_off.flags;
 	ring->sq.kdropped = ring->sq.ring_ptr + params->sq_off.dropped;
 	ring->sq.array = ring->sq.ring_ptr + params->sq_off.array;
@@ -275,6 +277,8 @@ int uring_import(int fd, struct io_uring *ring, struct io_uring_params *params)
 	ring->cq.kring_mask = ring->cq.ring_ptr + params->cq_off.ring_mask;
 	ring->cq.kring_entries = ring->cq.ring_ptr +
 				 params->cq_off.ring_entries;
+	ring->cq.ring_mask = *ring->sq.kring_mask;
+	ring->cq.ring_entries = *ring->sq.kring_entries;
 	ring->cq.koverflow = ring->cq.ring_ptr + params->cq_off.overflow;
 	ring->cq.cqes = ring->cq.ring_ptr + params->cq_off.cqes;
 	if (params->cq_off.flags)
