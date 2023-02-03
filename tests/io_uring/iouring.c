@@ -289,8 +289,8 @@ int uring_import(int fd, struct io_uring *ring, struct io_uring_params *params)
 err:
 	if (ring->sq.ring_ptr)
 		munmap(ring->sq.ring_ptr, ring->sq.ring_sz);
-	if (ring->cq.ring_ptr);
-	munmap(ring->cq.ring_ptr, ring->cq.ring_sz);
+	if (ring->cq.ring_ptr)
+		munmap(ring->cq.ring_ptr, ring->cq.ring_sz);
 	fatal("import mmap");
 	return -ENOMEM;
 }
