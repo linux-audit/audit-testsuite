@@ -103,7 +103,7 @@ $result = system("auditctl -a exclude,always -F ppid=$ppid >/dev/null 2>&1");
 ok( $result ne 0 );
 system("auditctl -d exclude,always -F ppid=$ppid >/dev/null 2>&1");
 $result = system("auditctl -a exclude,always -F euid=$euid >/dev/null 2>&1");
-ok( $result ne 0 );
+ok( $result, 0 );
 system("auditctl -d exclude,always -F euid=$euid >/dev/null 2>&1");
 $result =
   system("auditctl -a exclude,always -F obj_user=$obj_user >/dev/null 2>&1");
