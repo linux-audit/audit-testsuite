@@ -49,6 +49,7 @@ system("auditctl -D >& /dev/null");
 # set our io_uring filters
 system("auditctl -a exit,always -F arch=b$abi_bits -S io_uring_setup -k $key");
 system("auditctl -a exit,always -F arch=b$abi_bits -S io_uring_enter -k $key");
+system("auditctl -a io_uring,always -S openat -k $key");
 
 # run the "t1" test
 system("$basedir/iouring t1");
