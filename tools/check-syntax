@@ -71,6 +71,7 @@ function tool_c_style() {
 		--indent=force-tab=8 \
 		--indent-col1-comments \
 		--min-conditional-indent=0 \
+		--max-continuation-indent=80 \
 		--pad-oper \
 		--align-pointer=name \
 		--align-reference=name \
