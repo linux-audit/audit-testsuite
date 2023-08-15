@@ -20,6 +20,7 @@ TESTS := \
 	fanotify \
 	file_create \
 	file_delete \
+	file_permission \
 	file_rename \
 	filter_exclude \
 	filter_saddr_fam \
