@@ -1,0 +1,94 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 4 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+chomp( my $abi_bits = $ENV{MODE} != 0 ? $ENV{MODE} : `getconf LONG_BIT` );
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_ses, my $sesout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-ses-XXXX',
+    UNLINK   => 1
+);
+( my $fh_pid, my $pidout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-pid-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+my $result;
+
+# create a key and rule
+my $key = key_gen();
+$result = system(
+"auditctl -a always,exit -F arch=b$abi_bits -S write -F exit=-EINVAL -k $key"
+);
+ok( $result, 0 );
+
+# trigger open syscall error EINVAL
+$result = system("echo \"TESTING\" > /proc/self/status 2>/dev/null");
+ok( $result, 256 );
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# test for the SYSCALL message
+$result =
+  system("ausearch -i -m SYSCALL -sc write -k $key > $stdout 2> $stderr");
+ok( $result, 0 );
+
+# test if we generate the SYSCALL record correctly
+my $line;
+my $syscall_msg_match = 0;
+while ( $line = <$fh_out> ) {
+
+    # test if SYSCALL record matches
+    if (    $line =~ m?^type=SYSCALL ?
+        and $line =~ m? exit=EINVAL?
+        and $line =~ m? key=$key ? )
+    {
+        $syscall_msg_match = 1;
+        last;
+    }
+}
+ok($syscall_msg_match);
+
+###
+# cleanup
+system("auditctl -D >& /dev/null");
