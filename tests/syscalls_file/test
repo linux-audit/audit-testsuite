@@ -50,11 +50,15 @@ my $nr_openat2 = 437;
 my $key = key_gen();
 my $result;
 my $result_open = system(
-    "auditctl -a always,exit -F arch=b$abi_bits -S open -k $key 2> $stderr");
+"auditctl -a always,exit -F arch=b$abi_bits -F dir=$dir -S open -k $key 2> $stderr"
+);
 my $result_openat =
-  system("auditctl -a always,exit -F arch=b$abi_bits -S openat -k $key");
+  system(
+    "auditctl -a always,exit -F arch=b$abi_bits -F dir=$dir -S openat -k $key");
 my $result_openat2 =
-  system("auditctl -a always,exit -F arch=b$abi_bits -S $nr_openat2 -k $key");
+  system(
+"auditctl -a always,exit -F arch=b$abi_bits -F dir=$dir -S $nr_openat2 -k $key"
+  );
 ok( $result_open == 0 or $result_openat == 0 or $result_openat2 == 0 );
 
 # create a new file
