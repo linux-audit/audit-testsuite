@@ -67,9 +67,11 @@ if ( defined $ENV{ATS_DEBUG} && $ENV{ATS_DEBUG} == 1 ) {
 }
 
 # make sure the records had a chance to bubble through to the logs
-system("auditctl -m sync-$key");
+system("auditctl -m syncmarker-$key");
 for ( my $i = 0 ; $i < 10 ; $i++ ) {
-    if ( system("ausearch -m USER 2> /dev/null | grep -q sync-$key") eq 0 ) {
+    if (
+        system("ausearch -m USER 2> /dev/null | grep -q syncmarker-$key") eq 0 )
+    {
         last;
     }
     sleep(0.2);
