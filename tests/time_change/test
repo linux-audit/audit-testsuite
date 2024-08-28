@@ -169,7 +169,7 @@ sub test_adjtime_setoffset {
     filter_cleanup();
 }
 
-test_adjtime_setoffset( "adjtimex", "adjtimex",      42,  123456 );
+test_adjtime_setoffset( "adjtimex", "adjtimex",       42, 123456 );
 test_adjtime_setoffset( "posix",    "clock_adjtime", -10, 123456 );
 
 test_adjtime_setoffset( "adjtimex", "adjtimex",      0, 0 );
@@ -243,8 +243,8 @@ sub test_adjtime_ntpval_all {
 
 my $FC = ( 1000 << 16 );
 test_adjtime_ntpval_all( "adjust", 42,  42,         -42,  -42 );
-test_adjtime_ntpval_all( "offset", 100, "-?[0-9]+", 200,  "-?[0-9]+" );
+test_adjtime_ntpval_all( "offset", 100, "-?[0-9]+",  200, "-?[0-9]+" );
 test_adjtime_ntpval_all( "freq",   42,  42 * $FC,   -42,  -42 * $FC );
-test_adjtime_ntpval_all( "status", 0,   "[0-9]+",   0,    "[0-9]+" );
+test_adjtime_ntpval_all( "status", 0,   "[0-9]+",    0,   "[0-9]+" );
 test_adjtime_ntpval_all( "tai",    42,  42,         1234, 1234 );
-test_adjtime_ntpval_all( "tick",   0,   "-?[0-9]+", 0,    "-?[0-9]+" );
+test_adjtime_ntpval_all( "tick",   0,   "-?[0-9]+",  0,   "-?[0-9]+" );
