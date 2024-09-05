@@ -98,12 +98,12 @@ my $found_event_listener_disconnect = 0;
 
 while ( $line = <$fh_out> ) {
     if ( $line =~ /^type=(EVENT_LISTENER|UNKNOWN\[1335\]) / ) {
-        if ( $line =~ / nl-mcgrp=1 op=((dis|)connect) res=(yes|no)/ ) {
+        if ( $line =~ / nl-mcgrp=(audit-netlink-multicast|1) / ) {
             $found_event_listener = 1;
-            if ( $1 eq "connect" ) {
+            if ( $line =~ / op=connect / ) {
                 $found_event_listener_connect = 1;
             }
-            if ( $1 eq "disconnect" ) {
+            if ( $line =~ / op=disconnect / ) {
                 $found_event_listener_disconnect = 1;
             }
         }
