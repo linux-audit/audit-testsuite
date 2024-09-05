@@ -37,7 +37,7 @@ system("auditctl -D >& /dev/null");
 # Create test rule.
 my $key      = key_gen();
 my $testfile = "/tmp/$key";
-system("auditctl -w $testfile -k $key");
+system("auditctl -a always,exit -F path=$testfile -k $key");
 
 # Start fanotify watcher in the background.
 my $fanotify_pid = open3( undef, undef, undef, "$basedir/fanotify /tmp" );

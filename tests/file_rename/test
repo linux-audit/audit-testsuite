@@ -63,7 +63,7 @@ my $gid_fmt = getgrgid($uid);
 
 # set the directory watch
 my $key = key_gen();
-system("auditctl -w $dir -k $key");
+system("auditctl -a always,exit -F path=$dir -k $key");
 
 # move/rename the file
 rename( $filename, $filename . "-new" );

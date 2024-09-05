@@ -41,7 +41,7 @@ my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
 
 # set the directory watch
 my $key = key_gen();
-system("auditctl -w $dir -k $key");
+system("auditctl -a always,exit -F path=$dir -k $key");
 
 # create a new file in the watched directory
 ( my $fh, my $filename ) =
