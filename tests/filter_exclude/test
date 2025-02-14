@@ -162,7 +162,7 @@ for ( my $i = 0 ; $i < 10 ; $i++ ) {
 
 # test for the SYSCALL message provoked by unlink
 $result = system(
-"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -ul $auid -su $subj -ts recent > $stdout2 2> /dev/null"
+"ausearch -i -m SYSCALL -p $pid -ui $uid -gi $gid -su $subj -ts recent > $stdout2 2> /dev/null"
 );
 ok( $result, 0 );
 
