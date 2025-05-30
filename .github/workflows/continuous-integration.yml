@@ -11,7 +11,7 @@ on: ["push", "pull_request"]
 jobs:
   syntax:
     name: Check Syntax
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout from GitHub
       uses: actions/checkout@v2
@@ -21,7 +21,7 @@ jobs:
       run: ./tools/check-syntax -f && git diff --exit-code
   build:
     name: Build Tests
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout from GitHub
       uses: actions/checkout@v2
