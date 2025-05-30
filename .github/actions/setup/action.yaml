@@ -12,30 +12,13 @@ runs:
   steps:
   - run: sudo apt-get update
     shell: bash
-  - run: sudo apt-get install -y build-essential gcc-multilib python3-pip
+  - run: sudo apt-get install -y build-essential gcc-multilib python3-pip file
     shell: bash
   - run: sudo apt-get install -y astyle
     shell: bash
-  - run: |
-      # NOTE: liburing not packaged for ubuntu-20.04
-      git clone https://github.com/axboe/liburing.git liburing
-      cd liburing
-      ./configure
-      make
-      sudo make install
+  - run: sudo apt-get install -y liburing-dev
     shell: bash
-  - run: |
-      # NOTE: the distro package isn't current enough (ubuntu-20.04)
-      git clone https://github.com/perltidy/perltidy.git perltidy
-      cd perltidy
-      perl Makefile.PL
-      make
-      sudo make install
-      echo "/usr/local/bin" >> $GITHUB_PATH
+  - run: sudo apt-get install -y perltidy
     shell: bash
-  - run: |
-      # NOTE: the distro package isn't current enough (ubuntu-20.04)
-      sudo python3 -m pip install --upgrade pip
-      sudo python3 -m pip install yapf
-      echo "$HOME/.local/bin" >> $GITHUB_PATH
+  - run: sudo apt-get install -y python3-yapf
     shell: bash
