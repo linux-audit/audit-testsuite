@@ -1,0 +1,88 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 2 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create temp directory
+my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# set the directory watch
+my $key = key_gen();
+
+# create a child task
+my $pid = fork();
+if ( not $pid ) {
+    sleep 10;
+    exit 0;
+}
+
+# send a SIGSEGV signal to the child resulting in a coredump event
+system("kill -11 $pid &> /dev/null");
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# test if an ANOM_ABEND record was generated and if the signal
+# matches what was sent to force the coredump event
+system("ausearch -i -p $pid > $stdout 2> $stderr");
+my $line;
+my $found_anom_abend = 0;
+my $found_signal     = 0;
+
+while ( $line = <$fh_out> ) {
+    if ( $line =~ /^type=ANOM_ABEND / ) {
+        $found_anom_abend = 1;
+
+        if ( $line =~ / sig=SIGSEGV / ) {
+            $found_signal = 1;
+        }
+    }
+}
+
+ok($found_anom_abend);
+ok($found_signal);
+
+###
+# cleanup
+
+system("auditctl -D >& /dev/null");
+
