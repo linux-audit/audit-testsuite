@@ -19,6 +19,7 @@ TESTS := \
 	exec_execve \
 	exec_name \
 	fanotify \
+	field_compare \
 	file_create \
 	file_delete \
 	file_permission \
