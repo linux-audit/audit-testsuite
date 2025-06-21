@@ -1,0 +1,107 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 50 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create temp directory
+my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# uid fields tests
+my @fields = ( "auid", "uid", "euid", "suid", "fsuid", "obj_uid" );
+
+# equal operator
+for my $i ( 0 .. $#fields ) {
+    for ( my $j = $i + 1 ; $j <= $#fields ; $j++ ) {
+        my $key = key_gen();
+        system(
+"auditctl -a always,exit -S openat -C $fields[$i]=$fields[$j] -k $key > $stdout 2> $stderr"
+        );
+        my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
+        unlink($filename);
+        my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+        ok( $result, 0 );
+        system("auditctl -D >& /dev/null");
+    }
+}
+
+# not equal opeator
+for my $i ( 0 .. $#fields ) {
+    for ( my $j = $i + 1 ; $j <= $#fields ; $j++ ) {
+        my $key = key_gen();
+        system(
+"auditctl -a always,exit -S openat -C $fields[$i]!=$fields[$j] -k $key > $stdout 2> $stderr"
+        );
+        my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
+        unlink($filename);
+        my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+        ok( $result, 0 );
+        system("auditctl -D >& /dev/null");
+    }
+}
+
+# gid field tests
+@fields = ( "gid", "egid", "sgid", "fsgid", "obj_gid" );
+
+# equal tests
+for my $i ( 0 .. $#fields ) {
+    for ( my $j = $i + 1 ; $j <= $#fields ; $j++ ) {
+        my $key = key_gen();
+        system(
+"auditctl -a always,exit -S openat -C $fields[$i]=$fields[$j] -k $key > $stdout 2> $stderr"
+        );
+        my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
+        unlink($filename);
+        my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+        ok( $result, 0 );
+        system("auditctl -D >& /dev/null");
+    }
+}
+
+# not equal tests
+for my $i ( 0 .. $#fields ) {
+    for ( my $j = $i + 1 ; $j <= $#fields ; $j++ ) {
+        my $key = key_gen();
+        system(
+"auditctl -a always,exit -S openat -C $fields[$i]!=$fields[$j] -k $key > $stdout 2> $stderr"
+        );
+        my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
+        unlink($filename);
+        my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+        ok( $result, 0 );
+        system("auditctl -D >& /dev/null");
+    }
+}
+
