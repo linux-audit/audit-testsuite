@@ -23,6 +23,7 @@ TESTS := \
 	file_delete \
 	file_permission \
 	file_rename \
+	filter_device \
 	filter_exclude \
 	filter_exit \
 	filter_saddr_fam \
