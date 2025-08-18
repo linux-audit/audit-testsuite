@@ -25,6 +25,7 @@ TESTS := \
 	file_rename \
 	filter_exclude \
 	filter_exit \
+	filter_filetype \
 	filter_saddr_fam \
 	filter_sessionid \
 	io_uring \
