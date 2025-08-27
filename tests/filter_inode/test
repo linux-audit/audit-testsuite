@@ -1,0 +1,103 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 4 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# create a key
+my $key = key_gen();
+
+# create test file
+my $filename = "/tmp/$key-file";
+system("touch $filename");
+
+# get file information
+my $inode       = `stat --printf=%i $filename`;
+my $dev_maj     = `stat --printf=%Hd $filename`;
+my $dev_min     = `stat --printf=%Ld $filename`;
+my $dev_maj_hex = sprintf( "%02x", $dev_maj );
+my $dev_min_hex = sprintf( "%02x", $dev_min );
+
+# add audit rule with inode filter
+system(
+"auditctl -a always,exit -S all -F inode=$inode -F devmajor=$dev_maj -F devminor=$dev_min -k $key"
+);
+
+# do something with the file to trigger an event
+system("cp $filename $filename-new");
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+# check the results
+system("ausearch -i -k $key > $stdout 2> $stderr");
+
+my $line;
+my $found_path    = 0;
+my $inode_match   = 0;
+my $dev_match     = 0;
+my $found_syscall = 0;
+while ( $line = <$fh_out> ) {
+
+    # test if PATH record matches
+    if ( $line =~ /^type=PATH / ) {
+        $found_path = 1;
+
+        if ( $line =~ / inode=$inode / ) {
+            $inode_match = 1;
+        }
+
+        if ( $line =~ / dev=$dev_maj_hex:$dev_min_hex / ) {
+            $dev_match = 1;
+        }
+    }
+
+    # test if a SYSCALL record was generated
+    if ( $line =~ /^type=SYSCALL / ) {
+        $found_syscall = 1;
+    }
+}
+ok($found_path);
+ok($inode_match);
+ok($dev_match);
+ok($found_syscall);
+
+###
+# cleanup
+system("rm /tmp/$key*");
+system("auditctl -D >& /dev/null");
