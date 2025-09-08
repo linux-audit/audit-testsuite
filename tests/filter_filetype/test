@@ -1,0 +1,145 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 35 }
+
+use File::Temp qw/ tempdir tempfile /;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+( my $fh_ses, my $sesout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-ses-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# create a key
+my $key = key_gen();
+
+# set test cases
+# file_name, mode, syscall, system call args
+my @tests = (
+    [ "/tmp/$key-file", "file", "openat", "touch /tmp/$key-file" ],
+    [ "$key-dir",       "dir",  "mkdir",  "mkdir -p /tmp/$key-dir" ],
+    [
+        "/tmp/$key-socket.socket", "socket", "bind",
+        "nc -lU /tmp/$key-socket.socket | killall nc"
+    ],
+    [
+        "/tmp/$key-link", "link",
+        "sendto",         "ln -s /tmp/$key-file /tmp/$key-link"
+    ],
+    [
+        "/tmp/$key-character", "character",
+        "mknodat",             "mknod /tmp/$key-character c 10 1"
+    ],
+    [ "/tmp/$key-block", "block", "mknodat", "mknod /tmp/$key-block b 10 2" ],
+    [ "/tmp/$key-fifo",  "fifo",  "mknodat", "mknod /tmp/$key-fifo p" ]
+);
+
+# create rules
+for ( my $i = 0 ; $i < scalar @tests ; $i++ ) {
+    system(
+"auditctl -a always,exit -F dir=/tmp -F filetype=$tests[$i][1] -k $key-$tests[$i][1]"
+    );
+}
+
+# create files
+for ( my $i = 0 ; $i < scalar @tests ; $i++ ) {
+    system("$tests[$i][3]");
+}
+
+# make sure the records had a chance to bubble through to the logs
+for ( my $i = 0 ; $i < scalar @tests ; $i++ ) {
+    system("ausearch -ts now -i -k $key-$tests[$i][1] >> $stdout 2> $stderr");
+
+    system("auditctl -m syncmarker-$key-$tests[$i][1]");
+    for ( my $i = 0 ; $i < 10 ; $i++ ) {
+        if (
+            system("ausearch -m USER | grep -q syncmarker-$key-$tests[$i][1]")
+            eq 0 )
+        {
+            last;
+        }
+        sleep(0.2);
+    }
+}
+
+# check the results of each test case
+my $line;
+my $found_path;
+my $name_match;
+my $mode_match;
+my $found_syscall;
+my $syscall_match;
+for ( my $i = 0 ; $i < scalar @tests ; $i++ ) {
+    $found_path    = 0;
+    $name_match    = 0;
+    $mode_match    = 0;
+    $found_syscall = 0;
+    $syscall_match = 0;
+
+    while ( $line = <$fh_out> ) {
+
+        # test if PATH record matches
+        if ( $line =~ /^type=PATH / ) {
+            $found_path = 1;
+
+            if ( $line =~ / name=$tests[$i][0] / ) {
+                $name_match = 1;
+            }
+
+            if ( $line =~ /mode=$tests[$i][1]/ ) {
+                $mode_match = 1;
+            }
+        }
+
+        # test if SYSCALL record matches
+        if ( $line =~ /^type=SYSCALL / ) {
+            $found_syscall = 1;
+
+            if ( $line =~ / syscall=$tests[$i][2] / ) {
+                $syscall_match = 1;
+            }
+        }
+    }
+    ok($found_path);
+    ok($name_match);
+    ok($mode_match);
+    ok($found_syscall);
+    ok($syscall_match);
+    seek $fh_out, 0, 0;
+}
+
+###
+# cleanup
+system("rm -Rf /tmp/$key-*");
+
+system("auditctl -D >& /dev/null");
