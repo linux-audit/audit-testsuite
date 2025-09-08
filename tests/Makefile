@@ -16,6 +16,7 @@ TESTS := \
 	amcast_joinpart \
 	backlog_wait_time_actual_reset \
 	bpf \
+	coredump \
 	exec_execve \
 	exec_name \
 	fanotify \
