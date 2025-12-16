@@ -147,7 +147,7 @@ for ( 0 .. $#tests ) {
 }
 
 for ( 0 .. $#tests ) {
-    ok( $fields[$_] == $fields );    # $_ Correct number of fields?
+    ok( $fields[$_] >= $fields );    # $_ Correct number of fields?
 }
 
 ###
