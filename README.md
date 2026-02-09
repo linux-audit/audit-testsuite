@@ -38,7 +38,8 @@ please follow the instructions below.
 	              perl-Socket-Netlink \
 	              nmap-ncat \
 	              psmisc \
-	              liburing-devel
+	              liburing-devel \
+	              strace
 
 ### Fedora
 
@@ -54,7 +55,8 @@ please follow the instructions below.
 	              perl-Socket-Netlink \
 	              nmap-ncat \
 	              psmisc \
-	              liburing-devel
+	              liburing-devel \
+	              strace
 
 ### Debian Based Systems
 
