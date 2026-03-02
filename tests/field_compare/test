@@ -51,6 +51,16 @@ for my $i ( 0 .. $#fields ) {
         );
         my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
         unlink($filename);
+
+        # make sure the records had a chance to bubble through to the logs
+        system("auditctl -m syncmarker-$key");
+        for ( my $i = 0 ; $i < 10 ; $i++ ) {
+            if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+                last;
+            }
+            sleep(0.2);
+        }
+
         my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
         ok( $result, 0 );
         system("auditctl -D >& /dev/null");
@@ -66,6 +76,16 @@ for my $i ( 0 .. $#fields ) {
         );
         my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
         unlink($filename);
+
+        # make sure the records had a chance to bubble through to the logs
+        system("auditctl -m syncmarker-$key");
+        for ( my $i = 0 ; $i < 10 ; $i++ ) {
+            if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+                last;
+            }
+            sleep(0.2);
+        }
+
         my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
         ok( $result, 0 );
         system("auditctl -D >& /dev/null");
@@ -84,6 +104,16 @@ for my $i ( 0 .. $#fields ) {
         );
         my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
         unlink($filename);
+
+        # make sure the records had a chance to bubble through to the logs
+        system("auditctl -m syncmarker-$key");
+        for ( my $i = 0 ; $i < 10 ; $i++ ) {
+            if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+                last;
+            }
+            sleep(0.2);
+        }
+
         my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
         ok( $result, 0 );
         system("auditctl -D >& /dev/null");
@@ -99,6 +129,16 @@ for my $i ( 0 .. $#fields ) {
         );
         my $filename = tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
         unlink($filename);
+
+        # make sure the records had a chance to bubble through to the logs
+        system("auditctl -m syncmarker-$key");
+        for ( my $i = 0 ; $i < 10 ; $i++ ) {
+            if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+                last;
+            }
+            sleep(0.2);
+        }
+
         my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
         ok( $result, 0 );
         system("auditctl -D >& /dev/null");
