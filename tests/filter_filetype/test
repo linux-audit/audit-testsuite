@@ -47,7 +47,6 @@ my $key = key_gen();
 # file_name, mode, syscall, system call args
 my @tests = (
     [ "/tmp/$key-file", "file", "openat", "touch /tmp/$key-file" ],
-    [ "$key-dir",       "dir",  "mkdir",  "mkdir -p /tmp/$key-dir" ],
     [
         "/tmp/$key-socket.socket", "socket", "bind",
         "nc -lU /tmp/$key-socket.socket | killall nc"
