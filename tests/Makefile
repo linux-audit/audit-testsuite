@@ -31,6 +31,7 @@ TESTS := \
 	filter_inode \
 	filter_saddr_fam \
 	filter_sessionid \
+	fsnotify \
 	io_uring \
 	login_tty \
 	lost_reset \

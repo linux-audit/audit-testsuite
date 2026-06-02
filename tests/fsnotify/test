@@ -1,0 +1,117 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Test;
+BEGIN { plan tests => 5 }
+
+use File::Temp qw/ tempdir tempfile /;
+use File::Basename;
+
+###
+# functions
+
+sub key_gen {
+    my @chars = ( "A" .. "Z", "a" .. "z" );
+    my $key   = "testsuite-" . time . "-";
+    $key .= $chars[ rand @chars ] for 1 .. 8;
+    return $key;
+}
+
+###
+# setup
+
+# reset audit
+system("auditctl -D >& /dev/null");
+
+# create temp directory
+my $dir = tempdir( TEMPLATE => '/tmp/audit-testsuite-XXXX', CLEANUP => 1 );
+
+# create stdout/stderr sinks
+( my $fh_out, my $stdout ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-out-XXXX',
+    UNLINK   => 1
+);
+( my $fh_err, my $stderr ) = tempfile(
+    TEMPLATE => '/tmp/audit-testsuite-err-XXXX',
+    UNLINK   => 1
+);
+
+###
+# tests
+
+# create a new file into the temp directory
+( my $fh, my $filename ) =
+  tempfile( TEMPLATE => $dir . "/file-XXXX", UNLINK => 1 );
+
+# set the file watch
+my $key = key_gen();
+system("auditctl -a always,exit -F path=$filename -S all -k $key");
+
+# delete the directory to trigger a fsnotify event
+system("rm -Rf $dir");
+
+# make sure the records had a chance to bubble through to the logs
+system("auditctl -m syncmarker-$key");
+for ( my $i = 0 ; $i < 10 ; $i++ ) {
+    if ( system("ausearch -m USER | grep -q syncmarker-$key") eq 0 ) {
+        last;
+    }
+    sleep(0.2);
+}
+
+my $line;
+my $found_path_delete     = 0;
+my $found_syscall         = 0;
+my $found_add_rule        = 0;
+my $found_autoremove_rule = 0;
+my $file_bn               = basename($filename);
+
+# test if we generate any audit records from the watch
+my $result = system("ausearch -i -k $key > $stdout 2> $stderr");
+ok( $result, 0 );
+
+while ( $line = <$fh_out> ) {
+
+    # test if a PATH record associated to the file removal was
+    # generated
+    if ( $line =~ /^type=PATH / ) {
+        if ( $line =~ / name=$file_bn / and $line =~ / nametype=DELETE / ) {
+            $found_path_delete = 1;
+        }
+    }
+
+    # test if a SYSCALL unlink(at) record was generated
+    if ( $line =~ /^type=SYSCALL / ) {
+        if ( $line =~ / syscall=unlink(at)? / and $line =~ / success=yes / ) {
+            $found_syscall = 1;
+        }
+    }
+
+}
+ok($found_path_delete);
+ok($found_syscall);
+
+seek $fh_out, 0, 0;
+system("ausearch -i -m CONFIG_CHANGE > $stdout 2> $stderr");
+
+while ( $line = <$fh_out> ) {
+
+    # test if CONFIG_CHANGE add_rule and autoremove_rule records
+    # were generated
+    if ( $line =~ /^type=CONFIG_CHANGE / ) {
+        if ( $line =~ / op=add_rule / ) {
+            $found_add_rule = 1;
+        }
+
+        if ( $line =~ / op=autoremove_rule / ) {
+            $found_autoremove_rule = 1;
+        }
+    }
+}
+ok($found_add_rule);
+ok($found_autoremove_rule);
+
+###
+# cleanup
+system("auditctl -D >& /dev/null");
