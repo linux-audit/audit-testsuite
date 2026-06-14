@@ -51,7 +51,8 @@ system(
 );
 
 # run the test
-my $name = "arp_tables";
+# Can be any kernel module that isn't loaded by default
+my $name = "sg";
 $result = system("modprobe $name >/dev/null 2>&1");
 ok( $result, 0 );    # Did the modprobe succeed?
 
