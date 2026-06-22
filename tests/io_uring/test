@@ -3,7 +3,7 @@
 use strict;
 
 use Test;
-BEGIN { plan tests => 5 }
+BEGIN { plan tests => 6 }
 
 use File::Temp qw/ tempfile /;
 
@@ -51,8 +51,9 @@ system("auditctl -a exit,always -F arch=b$abi_bits -S io_uring_setup -k $key");
 system("auditctl -a exit,always -F arch=b$abi_bits -S io_uring_enter -k $key");
 system("auditctl -a io_uring,always -S openat -k $key");
 
-# run the "t1" test
+# run the io_uring tests
 system("$basedir/iouring t1");
+system("$basedir/iouring t2");
 for ( my $i = 0 ; $i < 10 ; $i++ ) {
     if ( system("ausearch -k $key >& /dev/null") eq 0 ) {
         last;
@@ -69,6 +70,7 @@ my $found_sc_setup  = 0;
 my $found_sc_enter  = 0;
 my $found_uop_open  = 0;
 my $found_uop_close = 0;
+my $found_uop_cmd   = 0;
 
 # find the io_uring syscalls and io_uring ops
 while ( $line = <$fh_out> ) {
@@ -84,11 +86,15 @@ while ( $line = <$fh_out> ) {
     if ( $line =~ /uring_op=19/ || $line =~ /uring_op=close/ ) {
         $found_uop_close = 1;
     }
+    if ( $line =~ /uring_op=46/ || $line =~ /uring_op=uring_cmd/ ) {
+        $found_uop_cmd = 1;
+    }
 }
 ok($found_sc_setup);
 ok($found_sc_enter);
 ok($found_uop_open);
 ok($found_uop_close);
+ok($found_uop_cmd);
 
 ###
 # cleanup
