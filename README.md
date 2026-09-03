@@ -68,6 +68,7 @@ below:
 	                  build-essential \
 	                  libc6-i386 \
 	                  libc6-dev-i386 \
+	                  libfile-which-perl \
 	                  perl-modules \
 	                  netcat \
 	                  psmisc \
